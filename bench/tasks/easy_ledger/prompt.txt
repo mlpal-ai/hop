@@ -1,0 +1,4 @@
+Users report two bugs in this ledger library:
+1. statement() returns running balances in file order, but the docstring promises chronological order — out-of-order input lines produce wrong intermediate balances.
+2. monthly_totals() returns months in first-seen order instead of chronological order.
+Fix both without changing any function signatures or return shapes. Keep behavior otherwise identical (rounding, comment/blank-line handling). Run the sanity tests to make sure nothing regressed.

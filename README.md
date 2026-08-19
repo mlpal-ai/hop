@@ -13,6 +13,8 @@ Plugins add capability at the edges of a loop. A profile tunes the loop itself.
 - **[SPEC.md](SPEC.md)** — the normative v1 specification
 - **[examples/](examples/)** — small real profiles (a fail-closed engineering profile,
   a hardened reviewer)
+- **[PAPER.md](PAPER.md)** — design, related work, and the no-regression benchmark
+- **[bench/](bench/)** — the benchmark: tasks, hidden suites, runner, raw logs
 
 ## Trying it
 
@@ -47,8 +49,7 @@ SPEC.md.
 Prior art note: LangChain Deep Agents uses "harness profile" for a per-model
 compatibility override layer; DeepSeek Harness profiles compose plugin runtimes.
 Neither carries loop policy with an eval and telemetry contract as one artifact —
-that integration is what this spec specifies. Full comparison in the paper
-(link forthcoming).
+that integration is what this spec specifies. Full comparison in [PAPER.md](PAPER.md).
 
 ## Contact
 

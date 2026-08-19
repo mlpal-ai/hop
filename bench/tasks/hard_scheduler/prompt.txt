@@ -1,0 +1,3 @@
+Production reports three intermittent failures in this scheduler under load:
+(1) submit() sometimes crashes with "cannot notify on un-acquired lock"; (2) occasionally a job runs twice, or a cancel() returns True yet the job still runs; (3) rarely, workers exit while pending jobs remain after shutdown(wait=True), violating G4.
+Fix the scheduler so guarantees G1-G4 in the module docstring hold under concurrency. Keep the public API (constructor, submit, cancel, results, shutdown) and single-process threading design. Make results() reflect completed jobs accurately. The fixes must be real synchronization fixes, not sleeps/timing bandaids.

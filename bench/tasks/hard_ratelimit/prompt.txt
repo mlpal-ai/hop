@@ -1,0 +1,1 @@
+Implement src/ratekit.py exactly per SPEC.md (TokenBucket, SlidingWindow, KeyedLimiter). Read the spec carefully — starting-full semantics, half-open window, denied-calls-not-recorded, injectable clock determinism, and lazy 300s key eviction are all load-bearing. Standard library only. The sanity test just checks imports; correctness will be judged against the spec.
