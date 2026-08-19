@@ -1,0 +1,11 @@
+# The reviewer builtin, restated as a YAML profile — what shipping a policy-different
+# profile looks like: read-only toolset, recon mode locked, verification fail-closed.
+# (yodex ships this as a builtin; the YAML form is the portable equivalent.)
+spec: mlpal/profile-v1
+name: reviewer-custom
+version: 0.1.0
+description: Read-only code review with verified, evidence-anchored findings.
+extends: reviewer
+# Tighten further: this team's reviews also may not run network fetches.
+permissions:
+  deny: ["WebFetch", "Bash(curl*)", "Bash(wget*)"]
