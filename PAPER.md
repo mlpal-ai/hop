@@ -1,4 +1,4 @@
-# Harness profiles: the agent loop as a versioned, evaluated, tunable artifact
+# HOP — Harness Optimization Profiles: the agent loop as a versioned, evaluated, tunable artifact
 
 MLPal · 2026-08 · contact@mlpal.ai
 
@@ -8,7 +8,7 @@ Coding-agent harnesses hide their most consequential decisions — when to verif
 model runs which subtask, what a session may touch, when to stop — in code. Config
 surfaces exist, but they either configure a harness without defining its objective, or
 (in the research literature) optimize an agent without standardizing the artifact being
-optimized. We describe **harness profiles** (`mlpal/profile-v1`): a declarative,
+optimized. We describe **harness profiles** (`mlpal/hop-v1`): a declarative,
 versioned artifact carrying a harness's loop policy (verification, permissions,
 routing, budgets, prompts, toolset) together with an **eval contract** defining success
 in its domain, a **telemetry contract** every run stamps, and an explicitly declared
@@ -49,7 +49,7 @@ open-ended self-modification.
 
 ## 2. The artifact
 
-A profile is a directory with a `profile.yaml` (full schema in the spec):
+A profile is a directory with a `hop.yaml` (full schema in the spec):
 
 - **capabilities** — toolset allowlist, prompt slots (system, verifier, summarizer,
   condenser)
@@ -70,7 +70,7 @@ Composition is single-inheritance with per-leaf deep merge (no whole-block
 replacement — dsh documents whole-row config replacement as its own top limitation, and
 we take the hint), a deny-list concat ratchet (a child can tighten, never loosen), and
 user-over-profile precedence everywhere except locked paths. The artifact declares
-`spec: mlpal/profile-v1` on pain of refusal; versioned from day one because the
+`spec: mlpal/hop-v1` on pain of refusal; versioned from day one because the
 migration path you don't design is the one you need.
 
 ## 3. The verification seam
@@ -191,6 +191,6 @@ otherwise.
 
 ## Availability
 
-Spec and examples: github.com/mlpal-ai/profile-spec. Reference implementation: yodex
-(`npm install -g @mlpal/yodex`), `yodex profile list|show|lint`. Benchmark tasks,
+Spec and examples: github.com/mlpal-ai/hop. Reference implementation: yodex
+(`npm install -g @mlpal/yodex`), `yodex hop list|show|lint`. Benchmark tasks,
 hidden suites, and raw run logs: published with the spec repo.

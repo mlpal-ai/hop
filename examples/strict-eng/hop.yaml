@@ -1,6 +1,6 @@
 # Coding, but nothing ships unverified: the adversarial verifier is on and fail-closed,
 # and the self-check fires from the second edit. Everything else inherits from coding.
-spec: mlpal/profile-v1
+spec: mlpal/hop-v1
 name: strict-eng
 version: 0.1.0
 description: Coding with a hard verification gate.

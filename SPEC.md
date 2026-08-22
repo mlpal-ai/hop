@@ -1,37 +1,38 @@
-# mlpal/profile-v1 — harness profile specification
+# HOP — Harness Optimization Profile (`mlpal/hop-v1`)
 
-Status: v1, implemented in yodex ≥ 0.9. This document is the normative reference for
-the artifact; the reference implementation is the loader in `@mlpal/yodex-engine`
-(`profile/schema` + `profile/load`).
+Status: v1. This document is the normative reference for the artifact; the reference
+implementation is the loader in the MLPal Harness engine (`@mlpal/harness`,
+`profile/schema` + `profile/load`), consumed by yodex ≥ 0.9.
 
-## 1. What a profile is
+## 1. What a HOP is
 
-A **harness profile** is a declarative, versioned artifact that configures an agent
-harness's *loop*, not just its edges:
+A **HOP (Harness Optimization Profile)** is a declarative, versioned artifact that
+configures an agent harness's *loop*, not just its edges:
 
 - **capabilities** — the toolset, prompt slots
 - **policies** — verification, permissions, routing, budgets
 - **evals** — the definition of success for the profile's domain
 - **telemetry** — the outcome facts every run stamps
 
-A plugin adds capability at the edges of the loop (tools, instructions, hooks). A
-profile tunes the loop itself, and because it is declarative, versioned, and scored by
-its own eval contract, it is the **unit of optimization**: a tuner can move any field
-declared `tunable`, within its declared range, and measure the result — and may never
-touch a field declared `locked`.
+A plugin adds capability at the edges of the loop (tools, instructions, hooks). A HOP
+tunes the loop itself, and because it is declarative, versioned, and scored by its own
+eval contract, it is the **unit of optimization**: a tuner can move any field declared
+`tunable`, within its declared range, and measure the result — and may never touch a
+field declared `locked`.
 
-The term "harness profile" has narrower prior use (LangChain Deep Agents'
-`HarnessProfile` is a per-model compatibility override layer). This spec's contribution
-is the integration: loop policy + eval contract + telemetry contract + a declared
-optimization surface in one artifact.
+Throughout this spec the generic noun "profile" means a HOP. (The generic phrase
+"harness profile" has narrower prior use — LangChain Deep Agents' `HarnessProfile` is
+a per-model compatibility override layer. This spec's contribution is the integration:
+loop policy + eval contract + telemetry contract + a declared optimization surface in
+one artifact.)
 
 ## 2. Artifact form
 
-A profile is a **directory** containing `profile.yaml` plus any files it references:
+A HOP is a **directory** containing `hop.yaml` plus any files it references:
 
 ```
 my-profile/
-  profile.yaml
+  hop.yaml
   prompts/
     system.md
   evals/
@@ -39,14 +40,14 @@ my-profile/
 ```
 
 The directory is the unit of distribution (copy, git, tar). Profile identity lives in
-`profile.yaml`, never in package-manager metadata. **Trust derives from where a profile
+`hop.yaml`, never in package-manager metadata. **Trust derives from where a profile
 was discovered** (builtin < user dir < project dir < explicit path), never from fields
 in the file.
 
-## 3. profile.yaml
+## 3. hop.yaml
 
 ```yaml
-spec: mlpal/profile-v1        # REQUIRED. Unversioned artifacts are refused.
+spec: mlpal/hop-v1        # REQUIRED. Unversioned artifacts are refused.
 name: strict-eng              # lowercase kebab-case; names dirs + telemetry dims
 version: 0.1.0                # the profile's own semver
 description: Coding with a hard verification gate.
