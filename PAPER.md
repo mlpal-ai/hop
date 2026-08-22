@@ -8,7 +8,7 @@ Coding-agent harnesses hide their most consequential decisions — when to verif
 model runs which subtask, what a session may touch, when to stop — in code. Config
 surfaces exist, but they either configure a harness without defining its objective, or
 (in the research literature) optimize an agent without standardizing the artifact being
-optimized. We describe **harness profiles** (`mlpal/hop-v1`): a declarative,
+optimized. We describe **HOPs — Harness Optimization Profiles** (`mlpal/hop-v1`): a declarative,
 versioned artifact carrying a harness's loop policy (verification, permissions,
 routing, budgets, prompts, toolset) together with an **eval contract** defining success
 in its domain, a **telemetry contract** every run stamps, and an explicitly declared
