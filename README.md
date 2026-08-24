@@ -40,8 +40,8 @@ independently evidence-checked is not delivered.
 ## Status
 
 v1. The spec covers the artifact, composition, lock semantics, the verification seam,
-and the eval/telemetry contracts. Declared-but-minimal in v1: eval suite running is
-local (`yodex hop eval`), and templated prompt slots (nudges, classifier) are
+and the eval/telemetry contracts. Declared-but-not-yet-runnable in v1: the eval schema ships and lints, the
+local runner (`yodex hop eval`) lands next; and templated prompt slots (nudges, classifier) are
 inheritable but only definable in builtin profiles. Both are called out inline in
 SPEC.md.
 
