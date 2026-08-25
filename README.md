@@ -50,6 +50,13 @@ compatibility override layer; DeepSeek Harness profiles compose plugin runtimes.
 Neither carries loop policy with an eval and telemetry contract as one artifact —
 that integration is what this spec specifies. Full comparison in [PAPER.md](PAPER.md).
 
+## License
+
+Specification text and documentation: [CC-BY-4.0](LICENSE) — implement it, quote it,
+build on it, with attribution. Example artifacts and benchmark code in this repo:
+Apache-2.0. The reference engine ([mlpal-harness](https://github.com/mlpal-ai/mlpal-harness))
+is Apache-2.0.
+
 ## Contact
 
 contact@mlpal.ai
