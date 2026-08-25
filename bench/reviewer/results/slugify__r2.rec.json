@@ -1,0 +1,1 @@
+{"repo": "slugify", "run": 2, "status": "success", "wall_s": 220.1, "output_tokens": 9251, "turns": 8, "gate_blocks": 3, "mutations": ["?? __pycache__/"], "clean": false, "exit": 0, "final_chars": 3620}

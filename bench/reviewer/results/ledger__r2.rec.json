@@ -1,0 +1,1 @@
+{"repo": "ledger", "run": 2, "status": "success", "wall_s": 425.2, "output_tokens": 19611, "turns": 9, "gate_blocks": 3, "mutations": ["?? src/__pycache__/", "?? tests/__pycache__/"], "clean": false, "exit": 0, "final_chars": 6735}

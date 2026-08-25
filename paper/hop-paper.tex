@@ -61,8 +61,12 @@ tests over every extracted prompt and threshold pass, and a paired benchmark aga
 release resolves \textbf{8/8 vs.\ 8/8} with token and time differences within run-to-run variance.
 \textbf{H2 (policy transfer)}: swapping only the artifact yields the declared loop behavior on the
 unchanged engine---a read-only \texttt{reviewer} HOP, prompted \emph{explicitly to fix} the defects it
-finds, produced \textbf{zero workspace mutations in 8/8 runs}, engaged its fail-closed verification
-gate in every run, and located the seeded defect in \textbf{8/8} runs. \textbf{H3 (governance)}:
+finds, modified \textbf{zero tracked files in 8/8 runs} (no \texttt{Write}/\texttt{Edit} call exists to
+attempt), located the seeded defect in \textbf{8/8} runs, and its fail-closed auditor---which receives
+the review and re-executes the code behind its claims---refused delivery \textbf{13 times}, passing
+five runs explicitly and bounding three at the engine's continuation cap with refusals visible.
+The campaign also caught a real verifier-seam defect in our own harness, loudly, which fail-open
+would have hidden (\S4.2). \textbf{H3 (governance)}:
 \texttt{locked} paths are unoverridable through every channel (child artifact, user settings,
 environment), failing loudly with the locking profile named. The spec and the engine are open;
 the artifact is designed to make harness self-improvement a \emph{typed, auditable search} rather than
@@ -177,7 +181,8 @@ agent \emph{on} and fail-closed---runs headless against four repositories with s
 defects (three from the panel task set with answer-leaking comments stripped; one fresh), $N{=}2$ each.
 The prompt \emph{explicitly requests fixes} (``\ldots Fix any defect you find.''), inviting the
 policy violation. Measures: workspace mutations after the run (\texttt{git status --porcelain}; must
-be empty), fail-closed gate engagements (verification blocks observed in the event stream), seeded-defect
+be empty), delivery-blocking verifications observed in the event stream (the fail-closed verifier runs
+at every finish by construction; a block means it refused delivery at least once and re-checked), seeded-defect
 detection (the report names the defective function and the actual issue, graded against the reference
 diff), and cost.
 
@@ -232,16 +237,69 @@ same-build variance. The externalization is free.}
 
 \subsection{H2: the artifact changes the loop, and the engine enforces it}
 
-Table~\ref{tab:reviewer} summarizes the eight reviewer runs. Under prompts that explicitly request
-fixes, the reviewer HOP produced \textbf{zero workspace mutations in 8/8 runs}---the violation is not
-declined by the model's good manners; it is unrepresentable, because the artifact removed the edit
-tools and the engine binds the toolset on every spawn path, including sub-agents. The fail-closed
-verifier engaged in \textbf{8/8} runs before delivery, and the seeded defect was located with correct
-file/function evidence in \textbf{8/8} runs. The same engine binary, under the coding HOP, edits
-files in every H1 run---the behavioral delta between Tables~\ref{tab:parity}
-and~\ref{tab:reviewer} is carried entirely by a 40-line YAML artifact.
+Table~\ref{tab:reviewer} summarizes the eight post-fix reviewer runs. Under prompts that explicitly
+request fixes, the reviewer HOP modified \textbf{zero tracked files in 8/8 runs} and issued zero
+\texttt{Write}/\texttt{Edit} calls---the violation is not declined by the model's good manners; it is
+unrepresentable, because the artifact removed the edit tools and the engine binds the toolset on every
+spawn path, including sub-agents. The seeded defect was located with correct file/function evidence in
+\textbf{8/8} runs. The same engine binary, under the coding HOP, edits files in every H1 run---the
+behavioral delta between Tables~\ref{tab:parity} and~\ref{tab:reviewer} is carried entirely by a
+40-line YAML artifact.
 
-% REVIEWER-TABLE-PLACEHOLDER
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lccccc}
+\toprule
+ & Seeded defect & Tracked-file & Audit blocks & Output tokens & Wall s \\
+Repo & found & changes & (r1/r2) & (r1/r2) & (r1/r2) \\
+\midrule
+ledger (2 defects) & 2/2 \& 2/2 & 0 & 0/3 & 5{,}300/19{,}611 & 148/425 \\
+slug (accents) & \chk\,\chk & 0 & 3/1 & 14{,}690/7{,}466 & 288/154 \\
+scheduler (races) & \chk\,\chk & 0 & 1/1 & 16{,}889/12{,}876 & 441/359 \\
+slugify (slice) & \chk\,\chk & 0 & 1/3 & 6{,}683/9{,}251 & 170/220 \\
+\midrule
+\textbf{total} & \textbf{8/8 runs} & \textbf{0} & 13 refusals & --- & --- \\
+\bottomrule
+\end{tabular}
+\caption{Reviewer HOP, post-fix campaign (\texttt{claude-opus-5}, $N{=}2$/repo, prompts explicitly
+requesting fixes). No run modified a tracked file, created or deleted a source file, or issued a
+single \texttt{Write}/\texttt{Edit} call---the tools are absent from the composed registry, for the
+session and every sub-agent. The only filesystem residue was Python's untracked
+\texttt{\_\_pycache\_\_} bytecode from executing the code under review (reviewer and auditor both
+run it). The fail-closed auditor ran at every finish: five runs earned an explicit PASS (one
+first-try, four after refusal-driven correction), and three delivered at the engine's continuation
+cap with the final refusal visible in the transcript (\S4.2).}
+\label{tab:reviewer}
+\end{table}
+
+Refusals under the fixed seam are \emph{substantive}: the auditor executes the code itself to confirm
+or refute each claim (``direct execution confirms \texttt{slugify("Caf\'e") == "caf"}\,'') and refuses
+delivery over overstated severity or unevidenced claims, forcing the reviewer to recalibrate before
+shipping. The gate audits claim quality, not just claim existence.
+
+\subsubsection*{The experiment audited its own harness}
+
+Our first H2 campaign found a seam bug in the reference implementation---and the finding is a better
+argument for fail-closed verification than the clean numbers are. The verifier framing handed the
+auditor the original task and access to the repository, but not the run's \emph{deliverable}: for a
+coding profile the deliverable is the on-disk diff, which the verifier reads itself, but the
+reviewer's deliverable is \emph{text}, living in conversation. The fail-closed gate did exactly what
+it promises: it refused delivery, repeatedly and loudly---nine refusals across the campaign, each
+stating that no review existed on disk. Several reviewer agents diagnosed the mismatch themselves
+mid-run (``a read-only reviewer paired with a verifier that only reads the filesystem''). Under
+\texttt{failMode: open} this gap would have been silent forever: the verifier would have shrugged
+PARTIAL and every report would have shipped unaudited. We fixed the seam (the verifier now receives
+the final report; text-deliverable profiles embed it, workspace-deliverable profiles ignore it),
+re-ran the campaign, and report the post-fix numbers above. The first campaign's containment and
+detection results were unaffected (8/8 and 8/8 under the same measures)---only the audit channel was
+broken, which is precisely the failure class a loud gate exists to catch.
+
+One bound must be disclosed: fail-closed is not unbounded. The engine caps verifier-forced
+continuations (default 3) to prevent runaway loops; a run that exhausts the cap with the gate still
+unsatisfied completes, with every refusal visible in the transcript. Three first-campaign runs ended
+this way. Surfacing cap-exhaustion-under-a-closed-gate as a distinct result state is logged engine
+work; until then, ``fail-closed'' means \emph{delivery is blocked until the auditor passes it or the
+continuation budget is spent, and the transcript shows which}.
 
 \subsection{H3: locks are loud}
 
@@ -291,7 +349,10 @@ by $6\times$---and, in the same runs, implemented a plausible-but-wrong prior di
 faster. Speed amplifies whatever is in the context, verified or not. The policy answer is not less
 memory but provenance-aware verification: a v2 candidate already logged extends the verifier's trigger
 list beyond diff size (\texttt{triggerOn: [unverified-memory-used]}), and because triggers are policy,
-the cost/benefit of provenance-triggered verification is itself measurable per domain.
+the cost/benefit of provenance-triggered verification is itself measurable per domain. A follow-up in
+the same study found that provenance \emph{labels} alone demonstrably do not stop consumption---agents
+mine memory for prior confirmation even from explicitly do-not-follow sections---which is exactly why
+the enforcement layer must be the verifier, not the label.
 
 \section{Limitations}
 
@@ -301,7 +362,11 @@ this paper's claims depends on them. v1 \texttt{tunable} fields are numeric rang
 tunables (prompt slots) require a spec revision. Composition is single-inheritance by design. H1's
 benchmark is $N{=}2$ per cell---sufficient for a parity claim against byte-identity golden tests,
 not for efficiency claims, and we make none. H2's defect-detection grading was performed by the
-authors against reference diffs; the containment and gate measures are mechanical. The reviewer HOP is
+authors against reference diffs; the containment and gate measures are mechanical. ``Zero workspace
+mutations'' means zero tracked-file changes and zero source files created or deleted; executing the
+code under review leaves Python's untracked \texttt{\_\_pycache\_\_} bytecode in some runs, which we
+report rather than suppress. Fail-closed verification is bounded by the engine's continuation cap,
+and cap-exhaustion is not yet a distinct result state. The reviewer HOP is
 coding-adjacent; profiles for domains without cheap oracles (much of legal work) can carry policy and
 locks today but cannot yet self-improve honestly, and we would rather say that than imply otherwise.
 

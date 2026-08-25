@@ -12,8 +12,8 @@ Plugins add capability at the edges of a loop. A HOP tunes the loop itself.
 - **[SPEC.md](SPEC.md)** — the normative v1 specification
 - **[examples/](examples/)** — small real profiles (a fail-closed engineering profile,
   a hardened reviewer)
-- **[PAPER.md](PAPER.md)** — design, related work, and the no-regression benchmark
-- **[bench/](bench/)** — the benchmark: tasks, hidden suites, runner, raw logs
+- **[paper/hop-paper.pdf](paper/hop-paper.pdf)** — the paper: hypotheses, measurements, related work
+- **[bench/](bench/)** — the evidence: H1 parity benchmark + H2 reviewer campaign, tasks, hidden suites, runners, raw logs
 
 ## Trying it
 

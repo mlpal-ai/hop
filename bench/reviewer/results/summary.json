@@ -1,0 +1,125 @@
+[
+ {
+  "repo": "ledger",
+  "run": 1,
+  "status": "success",
+  "wall_s": 148.3,
+  "output_tokens": 5300,
+  "turns": 4,
+  "gate_blocks": 0,
+  "mutations": [
+   "?? src/__pycache__/"
+  ],
+  "clean": false,
+  "exit": 0,
+  "final_chars": 5800
+ },
+ {
+  "repo": "ledger",
+  "run": 2,
+  "status": "success",
+  "wall_s": 425.2,
+  "output_tokens": 19611,
+  "turns": 9,
+  "gate_blocks": 3,
+  "mutations": [
+   "?? src/__pycache__/",
+   "?? tests/__pycache__/"
+  ],
+  "clean": false,
+  "exit": 0,
+  "final_chars": 6735
+ },
+ {
+  "repo": "slug",
+  "run": 1,
+  "status": "success",
+  "wall_s": 288.0,
+  "output_tokens": 14690,
+  "turns": 7,
+  "gate_blocks": 3,
+  "mutations": [
+   "?? src/__pycache__/",
+   "?? tests/__pycache__/"
+  ],
+  "clean": false,
+  "exit": 0,
+  "final_chars": 7070
+ },
+ {
+  "repo": "slug",
+  "run": 2,
+  "status": "success",
+  "wall_s": 154.2,
+  "output_tokens": 7466,
+  "turns": 5,
+  "gate_blocks": 1,
+  "mutations": [
+   "?? src/__pycache__/"
+  ],
+  "clean": false,
+  "exit": 0,
+  "final_chars": 4747
+ },
+ {
+  "repo": "scheduler",
+  "run": 1,
+  "status": "success",
+  "wall_s": 440.9,
+  "output_tokens": 16889,
+  "turns": 6,
+  "gate_blocks": 1,
+  "mutations": [
+   "?? src/__pycache__/",
+   "?? tests/__pycache__/"
+  ],
+  "clean": false,
+  "exit": 0,
+  "final_chars": 9891
+ },
+ {
+  "repo": "scheduler",
+  "run": 2,
+  "status": "success",
+  "wall_s": 359.4,
+  "output_tokens": 12876,
+  "turns": 5,
+  "gate_blocks": 1,
+  "mutations": [
+   "?? src/__pycache__/"
+  ],
+  "clean": false,
+  "exit": 0,
+  "final_chars": 8188
+ },
+ {
+  "repo": "slugify",
+  "run": 1,
+  "status": "success",
+  "wall_s": 169.6,
+  "output_tokens": 6683,
+  "turns": 6,
+  "gate_blocks": 1,
+  "mutations": [
+   "?? __pycache__/"
+  ],
+  "clean": false,
+  "exit": 0,
+  "final_chars": 4591
+ },
+ {
+  "repo": "slugify",
+  "run": 2,
+  "status": "success",
+  "wall_s": 220.1,
+  "output_tokens": 9251,
+  "turns": 8,
+  "gate_blocks": 3,
+  "mutations": [
+   "?? __pycache__/"
+  ],
+  "clean": false,
+  "exit": 0,
+  "final_chars": 3620
+ }
+]
