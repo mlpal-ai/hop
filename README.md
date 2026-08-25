@@ -48,7 +48,7 @@ SPEC.md.
 Prior art note: LangChain Deep Agents uses "harness profile" for a per-model
 compatibility override layer; DeepSeek Harness profiles compose plugin runtimes.
 Neither carries loop policy with an eval and telemetry contract as one artifact —
-that integration is what this spec specifies. Full comparison in [PAPER.md](PAPER.md).
+that integration is what this spec specifies. Full comparison in [the paper](paper/hop-paper.pdf).
 
 ## License
 
