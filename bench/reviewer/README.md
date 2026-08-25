@@ -17,3 +17,12 @@ changes, 0 Write/Edit calls, 13 substantive audit refusals; 5/8 explicit audit
 PASS, 3/8 delivered at the continuation cap with refusals visible. Campaign 1
 (pre-fix) caught the verifier-deliverable seam bug described in the paper §4.2;
 its runs are superseded by this post-fix campaign under identical measures.
+
+## One-leaf ablation (paper Table 3)
+
+`ablation/` — the same campaign with the auditor off via a one-leaf child HOP
+(`reviewer-noaudit/hop.yaml`: `verification.agent.enabled: false`). Detection held
+8/8, containment held 0 (carried by toolset+locks, not the auditor); the audit's
+measured price is +83% tokens / 3.0x wall, and what it buys is independent claim
+reproduction + calibration enforcement (13 refusal-driven corrections in the
+audited campaign).

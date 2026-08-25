@@ -1,0 +1,10 @@
+# One-leaf ablation of the reviewer HOP for the paper's accountability demonstration:
+# the independent auditor is OFF. Legal: verification.agent.enabled is not locked.
+# (failMode and the write-tool denial ARE locked — try to weaken those and the load errors.)
+spec: mlpal/hop-v1
+name: reviewer-noaudit
+version: 1.0.0
+description: Reviewer without the independent audit gate (ablation).
+extends: reviewer
+verification:
+  agent: { enabled: false }

@@ -46,15 +46,20 @@
 \begin{center}
 \begin{minipage}{0.92\textwidth}
 \small\color{ink}
-\textbf{Abstract.} An agent harness's most consequential decisions---when to verify, what a session
-may touch, which model runs which subtask, when to stop---live in code, invisible and unmeasurable.
-Existing configuration surfaces either configure a harness without defining its objective, or (in the
-research literature on self-improving agents) optimize harness code without standardizing the artifact
-being optimized. We introduce the \textbf{Harness Optimization Profile (HOP)}: a declarative, versioned
-artifact that carries a harness's loop policy---verification, permissions, routing, budgets, prompts,
-toolset---\emph{together with} the eval contract that defines success in its domain, the telemetry
-contract every run stamps, and an explicit optimization surface: \texttt{tunable} fields with declared
-ranges and \texttt{locked} fields that no child profile, user setting, or tuner may move. We state three
+\textbf{Abstract.} Agent systems accumulate capability without accountability. Skills, plugins,
+tools, and MCP servers attach to a harness with no evaluation metric---no one can answer whether a
+given attachment makes the agent better, worse, or merely longer---and the loop policy around them
+(when to verify, what a session may touch, which model runs which subtask, when to stop) lives in
+code, invisible and unmeasurable. Existing surfaces either configure a harness without defining its
+objective, or (in the research literature on self-improving agents) optimize harness code without
+standardizing the artifact being optimized. We introduce the \textbf{Harness Optimization Profile
+(HOP)}: a declarative, versioned artifact that is the \emph{unit of accountability} for everything a
+harness runs with. A HOP binds the capabilities an agent is given (toolset, prompts) and the loop
+policy that governs them (verification, permissions, routing, budgets) to the eval contract that
+defines success in its domain and the telemetry contract every run stamps---so every attachment and
+every policy choice becomes a measurable, reversible experiment against the artifact's own definition
+of good. An explicit optimization surface completes the contract: \texttt{tunable} fields with
+declared ranges, and \texttt{locked} fields that no child profile, user setting, or tuner may move. We state three
 falsifiable hypotheses and test them on the reference implementation. \textbf{H1 (fidelity)}:
 externalizing a production harness's policy into a HOP is behavior-preserving---byte-identity golden
 tests over every extracted prompt and threshold pass, and a paired benchmark against the pre-split
@@ -68,9 +73,11 @@ five runs explicitly and bounding three at the engine's continuation cap with re
 The campaign also caught a real verifier-seam defect in our own harness, loudly, which fail-open
 would have hidden (\S4.2). \textbf{H3 (governance)}:
 \texttt{locked} paths are unoverridable through every channel (child artifact, user settings,
-environment), failing loudly with the locking profile named. The spec and the engine are open;
-the artifact is designed to make harness self-improvement a \emph{typed, auditable search} rather than
-open-ended self-modification.
+environment), failing loudly with the locking profile named. A one-leaf ablation completes the
+accountability demonstration: disabling the reviewer's auditor is a single versioned line whose cost
+and effect the same measures price directly---policy becomes a diffable, priced decision. The spec and
+the engine are open; the artifact is designed to make harness self-improvement a \emph{typed,
+auditable search} rather than open-ended self-modification.
 \end{minipage}
 \end{center}
 
@@ -114,6 +121,19 @@ bar: the definition of success for \emph{this} domain, attached to the artifact.
 \item \textbf{Telemetry} --- the \texttt{task\_type} dimension stamped on every run outcome, so
 outcomes are attributable to a (profile, version) pair.
 \end{itemize}
+
+The organizing principle is \textbf{accountability}: capabilities in, policy around, evals
+underneath, everything versioned together. Today's capability ecosystems---skills, plugins, MCP
+servers---are additive-only: attachments accumulate because nothing measures them, so nothing is ever
+removed. Binding capabilities to an eval contract inverts this. Adding a skill becomes an experiment
+(run the suites; keep it if the score moves); removing one becomes \emph{safe} for the first time
+(prune, re-run, keep the leaner artifact if the score holds). We expect the long arc to bend toward
+leaner HOPs: as models absorb capability, pruning experiments should let the scaffolding
+evaporate---while what remains is exactly what model progress never supplies: permissions, locks,
+data boundaries, verification policy, and the definition of success. A tuned HOP is tuned
+\emph{against a model}, and a model upgrade both enables pruning and invalidates tunings; the
+telemetry contract stamps (profile, version, model) on every outcome so re-tuning is a measured
+operation, not a guess.
 
 Two field classes make the HOP an optimization contract rather than a configuration file.
 \texttt{tunable} declares paths a tuner may move, each with a range. \texttt{locked} declares paths
@@ -301,6 +321,44 @@ this way. Surfacing cap-exhaustion-under-a-closed-gate as a distinct result stat
 work; until then, ``fail-closed'' means \emph{delivery is blocked until the auditor passes it or the
 continuation budget is spent, and the transcript shows which}.
 
+\subsection{Pricing a policy in one line}
+
+The accountability claim says a policy choice should be a measurable, reversible experiment. We
+demonstrate with the smallest possible diff: a child artifact of the reviewer HOP whose entire body is
+one leaf---\texttt{verification.agent.enabled: false}, the auditor off. The change is \emph{legal}
+(that leaf is not locked) where weakening \texttt{failMode} or restoring write access would error at
+load---the lock/tunable distinction doing its job on a real diff. Re-running the identical campaign
+prices the policy directly:
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lcccccc}
+\toprule
+Campaign & Detection & Tracked changes & Refusals & Output tokens & Wall & \\
+\midrule
+reviewer (audited) & 8/8 & 0 & 13 & 92{,}766 & 36.8\,min & \\
+reviewer-noaudit & 8/8 & 0 & 0 & 50{,}732 & 12.3\,min & \\
+\midrule
+\textbf{the audit's price} & --- & --- & --- & $+$83\% & $+$3.0$\times$ & \\
+\bottomrule
+\end{tabular}
+\caption{One-leaf ablation, identical campaign (4 repos $\times$ $N{=}2$, \texttt{claude-opus-5}).
+Attribution falls out cleanly: \emph{containment} (zero tracked changes) is carried by the artifact's
+toolset and locks---it holds with the auditor off. \emph{Detection} of the seeded defects held at this
+task scale without the audit. What the audit specifically buys is independent reproduction of every
+claim and calibration enforcement---its 13 refusals forced corrections of overstated or unevidenced
+findings before delivery---at a measured price of $+$83\% tokens and $3\times$ wall clock. (The
+audited campaign's \texttt{\_\_pycache\_\_} residue also disappears here: it was the auditor executing
+the code under review.)}
+\label{tab:ablation}
+\end{table}
+
+The artifact turns ``should reviews be independently audited?'' from a philosophy debate into a
+per-domain line item: this is what the audit costs, this is what it enforces, and either choice is a
+one-line versioned diff away. A compliance-bound organization keeps the auditor and pays the
+premium; an internal triage bot drops it; both decisions are visible in version control and priced by
+the same suites.
+
 \subsection{H3: locks are loud}
 
 All enforcement properties hold under test. A child artifact overriding \texttt{permissions.defaultMode}
@@ -343,6 +401,18 @@ not rewrite (published suites are referenced immutably). Locked fields make the 
 governance surface: an organization locks permissions, data boundaries, and fail-closed verification;
 the tuner optimizes freely inside the fence.
 
+\textbf{The system the artifact enables.} Because the HOP carries its own definition of success, an
+\emph{assembly line} for agents becomes possible, and it is what we are building next. A HOP Builder
+(an agent itself, running on this engine) interviews the author: the domain, the risk posture (which
+fields to lock, whether verification fails closed), the environment---drawing user and organization
+context from memory---and, non-negotiably, the eval suites, because the Builder refuses to attach any
+capability without the metric that will judge it. It drafts the HOP, tunes it against its suites, and
+ships it. From there, auto-tuning is on by default: live telemetry, stamped with (profile, version,
+model), feeds the tuner, which moves only \texttt{tunable} fields within declared ranges, proposes
+version bumps as reviewable diffs, and never touches a lock. Domains onboard in order of
+verifiability---code and infrastructure have cheap oracles; domains without them can carry policy and
+locks today and gain honest self-improvement only when their eval problem is solved.
+
 \textbf{Verification policy is the load-bearing case.} A companion study of organizational-memory
 integration on our hardest benchmark terrain found that distilled memory collapsed time-to-first-edit
 by $6\times$---and, in the same runs, implemented a plausible-but-wrong prior diagnosis $6\times$
@@ -356,10 +426,13 @@ the enforcement layer must be the verifier, not the label.
 
 \section{Limitations}
 
-The tuner and the local eval runner are specified but not yet shipped; their input (eval suites in the
-artifact) and output (a frozen telemetry contract with a companion memory system) exist, and nothing in
-this paper's claims depends on them. v1 \texttt{tunable} fields are numeric ranges; text-typed
-tunables (prompt slots) require a spec revision. Composition is single-inheritance by design. H1's
+The tuner, the local eval runner, and the HOP Builder are specified but not yet shipped; their input
+(eval suites in the artifact) and output (a frozen telemetry contract with a companion memory system)
+exist, and nothing in this paper's claims depends on them. v1 carries the toolset allowlist and
+prompts, but skills and MCP servers are still declared host-side; moving them into the artifact's
+capabilities section---so the eval contract scores the fully self-contained assembly---is the first
+item of spec v2. v1 \texttt{tunable} fields are numeric ranges; text-typed tunables (prompt slots)
+require the same revision. Composition is single-inheritance by design. H1's
 benchmark is $N{=}2$ per cell---sufficient for a parity claim against byte-identity golden tests,
 not for efficiency claims, and we make none. H2's defect-detection grading was performed by the
 authors against reference diffs; the containment and gate measures are mechanical. ``Zero workspace
