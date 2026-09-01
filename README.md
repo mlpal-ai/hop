@@ -40,10 +40,15 @@ independently evidence-checked is not delivered.
 ## Status
 
 v1. The spec covers the artifact, composition, lock semantics, the verification seam,
-and the eval/telemetry contracts. Declared-but-not-yet-runnable in v1: the eval schema ships and lints, the
-local runner (`yodex hop eval`) lands next; and templated prompt slots (nudges, classifier) are
-inheritable but only definable in builtin profiles. Both are called out inline in
-SPEC.md.
+the eval/telemetry contracts, and the optimization surface — eval `role`s (golden /
+frontier / probe) with the deterministic-gates-only rule, the `tuning` control plane
+(cadence + promotion gate, reference-validated at load, lock-checkable), and the
+content-free D11.2 run-outcome telemetry envelope the engine emits at every run's finish.
+Declared-but-not-yet-runnable in v1: the eval schema ships and lints, the local runner
+(`yodex hop eval`) lands next; the optimizer that consumes the telemetry (distill →
+propose → eval-gate → promote) is a separate build; and templated prompt slots (nudges,
+classifier) are inheritable but only definable in builtin profiles. All are called out
+inline in SPEC.md.
 
 Prior art note: LangChain Deep Agents uses "harness profile" for a per-model
 compatibility override layer; DeepSeek Harness profiles compose plugin runtimes.

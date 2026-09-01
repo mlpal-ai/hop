@@ -96,6 +96,29 @@ evals:
     scorer: "python -m pytest -q"
     runs: 2
     passBar: 1.0
+    role: probe               # golden | frontier | probe (see §6); unset = informational
+  - name: coding-golden
+    tasks: evals/golden
+    scorer: "python -m pytest -q"
+    runs: 3
+    passBar: 1.0
+    role: golden              # mandatory-pass, gates by default
+  - name: token-cost
+    tasks: evals/frontier
+    scorer: "python score_tokens.py"   # scorer computes the tuned number
+    runs: 3
+    passBar: 0
+    role: frontier
+
+tuning:                       # how + when this HOP is tuned; the promotion gate (§6.2)
+  cadence: daily              # daily | weekly | monthly | on-incident | per-<N>-runs
+  minRunsSinceLast: 200       # statistical-power floor before a proposal
+  canaryFraction: 0.1
+  canaryMinRuns: 50
+  promote: human              # human | auto (auto needs a mandatory-pass golden gate)
+  frontierMetric: token-cost  # an eval with role: frontier
+  promotionMargin: "-5% at p<.05"
+  goldenSuite: coding-golden  # an eval with role: golden
 
 locked: []                    # dot paths no child, user setting, or tuner may touch
 tunable:                      # the declared optimization surface
@@ -166,6 +189,64 @@ only declared paths, only within range, and never a `locked` path. Published eva
 suites are referenced immutably (a digest pins the task set) so a tuned profile can't
 grade itself against a drifted rubric.
 
+### 6.1 Eval roles and the deterministic-gates-only rule
+
+Each eval suite may declare a `role`, and a `gates` boolean:
+
+- **golden** — mandatory-pass, frozen correctness invariants that may never regress. A
+  candidate failing any golden is rejected outright, no tradeoff math. `gates: true` by
+  default.
+- **frontier** — the scored metric being tuned (its scorer *computes the number*:
+  median tokens, $/task, resolve rate, wall time). Promotion requires the preregistered
+  margin on it. `gates: false` (it is scored, not a pass/fail gate).
+- **probe** — cheap deterministic smoke that kills obviously broken candidates before
+  expensive evals spend money. `gates: true` by default.
+
+The hard rule: **anything that gates promotion must be deterministic and re-runnable**.
+An LLM-judged suite MUST set `gates: false` — it informs, it never gates. The loader
+defaults `gates` by role; an author overrides it explicitly, and the tuner honors it.
+
+### 6.2 `tuning` — how and when a HOP is optimized
+
+`tuning` is the control-plane complement to `tunable` (what may move) and `locked`
+(what may never): it declares the cadence and the promotion gate. Fields:
+
+| Field | Meaning |
+|---|---|
+| `cadence` | `daily` \| `weekly` \| `monthly` \| `on-incident` \| `per-<N>-runs`. A property of the HOP, derived by the author from telemetry volume, environment drift rate, blast radius, and eval cost — high-traffic read-only HOPs tune daily; payment/infra HOPs tune slowly. |
+| `minRunsSinceLast` | statistical-power floor: a proposal needs at least this many new runs. |
+| `canaryFraction` / `canaryMinRuns` | canary rollout size before promote/rollback is decided. |
+| `promote` | `human` (a person merges the promotion) or `auto` (green evals promote). |
+| `frontierMetric` | names an eval suite with `role: frontier`. |
+| `promotionMargin` | the preregistered win bar, e.g. `"-5% at p<.05"`. |
+| `goldenSuite` | names an eval suite with `role: golden`. |
+
+Load-time enforcement: `frontierMetric` must resolve to a `role: frontier` suite and
+`goldenSuite` to a `role: golden` suite; `promote: auto` is refused unless the golden
+suite actually gates (`gates: true`) — you cannot auto-promote without a mandatory-pass
+gate. A tuning block is all-or-nothing: a partial block is a loud error. `tuning` is
+lock-checkable — a parent that sets `locked: [tuning.promote]` forces `human` on every
+child (a blast-radius ratchet). The deeper blast-radius gate on `promote: auto` (an
+apply-capable HOP may not self-promote) is enforced by the tuner, which resolves tool
+capability tags the loader does not have.
+
+### 6.3 Telemetry contract (D11.2)
+
+Every run emits one **content-free** run-outcome event — the Capture stage of the
+optimizer. Content-free by construction: the payload is an explicit allowlist of
+outcome facts, never transcript text, so fleet aggregation has nothing to leak. The
+payload carries: `hop {name, version}`, `model`, `tier`, `task_type`, `run_result`
+(`success` \| `error` \| `max_turns` \| `cancelled`), `failure_class`, a per-mechanism
+`checks` map (`self_check` / `anti_churn` / `observe {ran, passed}` / `agent {verdict}`),
+`tokens {input, output, cache_read_input, cache_creation_input}`, `wall_ms`, and `turns`.
+
+`failure_class` is the failure-taxonomy label (`failure_class_vocab@v1`): `empty_patch`,
+`step_budget_stall`, `test_timeout`, `tool_error`, `gateway_error`, `verifier_reject`,
+`user_cancelled`, `other`. It is **null iff `run_result` is `success`**. An emitter that
+cannot classify a failure emits `other` — never the nearest bucket, because unclassified
+volume is itself a signal. `contract: "d11.2"` marks the version; consumers accept prior
+versions under their own stamp rather than coercing.
+
 ## 7. Host plane (what a profile can never reach)
 
 The harness's catastrophic-action denials and protected-write rules, credential and
@@ -179,5 +260,7 @@ An implementation conforms if it: refuses artifacts without `spec:`; rejects unk
 top-level keys loudly; composes per §4 including lock enforcement at both compose time
 and settings-application time; applies the toolset allowlist to **every** run path the
 session can spawn (sub-agents, peer agents, workflow agents) so a restricted profile
-cannot launder capability through a child; and stamps `telemetry.taskType` on run
-outcomes.
+cannot launder capability through a child; stamps `telemetry.taskType` on run outcomes;
+validates `tuning` references against declared eval roles and refuses `promote: auto`
+without a gating golden suite (§6.2); and emits the content-free D11.2 run-outcome
+envelope (§6.3) with `failure_class` null iff success.

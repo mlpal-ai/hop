@@ -1,0 +1,38 @@
+# A coding HOP that declares its optimization loop: an eval of each gating role and a
+# complete tuning policy. High-traffic + read-only-ish, so it tunes daily; promotion stays
+# human until the loop has earned auto. Everything else inherits from coding.
+spec: mlpal/hop-v1
+name: tuned-coding
+version: 0.1.0
+description: Coding with a declared tuning loop (roles + cadence + promotion gate).
+extends: coding
+
+evals:
+  - name: probe-smoke
+    tasks: evals/probe
+    scorer: "python -m pytest -q tests/smoke"
+    runs: 1
+    passBar: 1.0
+    role: probe
+  - name: coding-golden
+    tasks: evals/golden
+    scorer: "python -m pytest -q"
+    runs: 3
+    passBar: 1.0
+    role: golden
+  - name: output-tokens
+    tasks: evals/frontier
+    scorer: "python score_output_tokens.py"   # scorer emits the tuned number
+    runs: 3
+    passBar: 0
+    role: frontier
+
+tuning:
+  cadence: daily
+  minRunsSinceLast: 200
+  canaryFraction: 0.1
+  canaryMinRuns: 50
+  promote: human
+  frontierMetric: output-tokens
+  promotionMargin: "-5% at p<.05"
+  goldenSuite: coding-golden
