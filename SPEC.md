@@ -240,6 +240,13 @@ payload carries: `hop {name, version}`, `model`, `tier`, `task_type`, `run_resul
 `checks` map (`self_check` / `anti_churn` / `observe {ran, passed}` / `agent {verdict}`),
 `tokens {input, output, cache_read_input, cache_creation_input}`, `wall_ms`, and `turns`.
 
+`run_result` is loop **completion**, not task correctness: `success` means the run reached
+its finish gate without error/stall/abort — a wrong-but-complete answer is still `success`.
+Whether the work is correct is a graded, out-of-band signal this content-free event
+deliberately omits; a consumer joins it from an external grader and must never read `success`
+as "resolved". A tuner's frontier metric is scored on the eval contract (§6.2), never inferred
+from `run_result`.
+
 `failure_class` is the failure-taxonomy label (`failure_class_vocab@v1`): `empty_patch`,
 `step_budget_stall`, `test_timeout`, `tool_error`, `gateway_error`, `verifier_reject`,
 `user_cancelled`, `other`. It is **null iff `run_result` is `success`**. An emitter that
