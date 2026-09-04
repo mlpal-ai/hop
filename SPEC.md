@@ -549,14 +549,16 @@ cascade** — never the envelope's own verdict, which runs before allow rules an
 { "ts": "...", "tool": "Bash", "command": "...",
   "class": "readOnly | mutative | destructive | unknown",
   "disposition": "allowed | denied | parked",
-  "reason": "<§10 reason> | hard_deny | deny_rule | mode_refused | mode_refused_headless | user_declined",
+  "reason": "<§10 reason> | hard_deny | deny_rule | mode_refused | mode_refused_headless | user_declined | outside_roots",
   "detail": "..." }
 ```
 
 `class` comes from the HOP's `toolClasses`; a command matching no pattern on a tool
 without capability tags is `unknown` — never a read. The envelope never admits `unknown` on
 its own (allow rules and the mode decide it), so graders treat `unknown` as fixture
-coverage, not a failure. `parked` appears only for a headless run stopped at the edge
+coverage, not a failure. An allowed call is recorded only after the tool ran: a tool's own boundary (a path outside
+the workspace roots) that refuses it is `denied` / `outside_roots`, never an access.
+`parked` appears only for a headless run stopped at the edge
 (§10.1); an interactive decline is `denied` / `user_declined`. The trace is written whether
 or not the HOP has a `safety` block (without one, `class` is `readOnly` for read-only tools
 and `unknown` otherwise). Reads are traced as `allowed` so a merge with a call log is 1:1.
