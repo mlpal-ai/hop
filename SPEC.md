@@ -216,7 +216,9 @@ gates through it:
    permits PARTIAL/unverifiable outcomes (prevents runaway loops); `failMode: closed`
    blocks anything but an explicit PASS — the setting for domains where an unverified
    result must not be delivered. Fail-closed profiles never skip verification via the
-   risk gate.
+   risk gate. `verification.agent.task` (v1.1) defines the verifier's user-turn framing
+   in YAML (`{task}`/`{deliverable}` substituted) — a HOP whose deliverable is TEXT (not an
+   on-disk diff) needs this, or a fail-closed gate audits a filesystem that cannot hold it.
 
 Harness requirement: loop heuristics MUST key off tool **capability tags** (edits /
 executes), never tool names, so a profile with a restricted or renamed toolset keeps
@@ -426,9 +428,12 @@ output is reduced to a **state** — `absent | unconfigured | expired | no_perms
 — plus identity / account / region; keys, session tokens, and ADC contents are never echoed or
 logged. `detect` is required, `setup` optional. `detect` accepts either a shell string
 (`"aws --version"`, which only proves installation) or a named `builtin:<domain>` detector
-(`builtin:aws`, mirroring `verification.observe: builtin:coding`) so a domain's canonical
-detector is referenced, not re-derived per HOP. Preflight is a host capability; the HOP only
-*declares* the requirements.
+(`builtin:aws`), which the host resolves to the HOP's canonical detector — `tools/hop_detect.py
+<domain>`, run from the HOP dir — and which **emits one of the six states on stdout** (plus
+guidance), so the finer states are captured rather than a coarse installed/absent. A shell
+detector also runs from the HOP dir (a HOP may reference its own `tools/`) and falls back to
+exit-code mapping; stdout is scanned only for a state token. Preflight is a host capability; the
+HOP only *declares* the requirements.
 
 ## 10. Safety envelope (v1.1)
 
