@@ -375,8 +375,11 @@ model:
   subagents: { readOnly: cheap, verify: frontier }
 ```
 
-**Load-time rules.** (1) A tier referenced by `model.main`/`subagents.*` must resolve to at least
-one model; an empty or unknown tier is a **load error**, never a silent catalog fallback. (2)
+**Load-time rules.** (1) Tier **names** follow a grammar — `^[a-z][a-z-]{0,31}$` (lowercase +
+hyphens, no digits or uppercase), a load error otherwise — so a tier name can never collide with a
+pinned model id. Classification is then pure **table membership**: a `model.main`/`subagents.*`
+token present in the resolved tier table is that tier; any other token is a pinned model id the
+serving layer validates (`sol` resolves precisely because it is *not* in the table). (2)
 `fallbacks` is ordered and consulted **only on serving failure** (unavailable/overloaded), never
 on quality; a `model.main` fallback that is a **known lower tier's primary** is a load error (a
 `max` main loop may not silently degrade to `cheap`), while a fallback whose tier is unknown is
