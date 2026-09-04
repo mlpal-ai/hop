@@ -242,10 +242,9 @@ the one thing a numeric range could not express. A move is in-range if the targe
 within the numeric bounds, or a member of the enum set. (Absent this, a model/tier knob
 had no declarable range at all — the gap that made tier routing an unenactable proposal.)
 
-For `model.*` paths the membership test is applied **after catalog resolution**: a pinned
-id (`claude-opus-5`) is in-range if the catalog places it in a listed tier, and an enum-set
-may also list ids directly. So `[frontier, max]` admits any id the catalog resolves into
-those tiers.
+For `model.*` paths the enum-set enumerates **tier names from the resolved tier table** (§8):
+`[frontier, max]` admits those tiers. A pinned id is in-range if it is a primary of a listed
+tier; a change to the `tiers` contents themselves is an ordinary eval-gated HOP diff.
 
 ### 6.1 Eval roles and the deterministic-gates-only rule
 
@@ -343,26 +342,58 @@ tuner can move — not a runtime accident. Before v1.1 the served model was chos
 runner/settings/catalog and no HOP field named it, so "route this class to a different
 tier" was a proposal with no knob to enact. `model` closes that.
 
-- `main` — the main loop's model: a tier alias (`cheap|mid|frontier|max`, resolved through
-  the catalog) or a pinned id (`claude-opus-5`). The premium, domain-appropriate model the
-  loop runs on.
-- `subagents` — per-role subagent model policy (`{readOnly, verify}`, tier or id): a cheap
+- `tiers` — the tier definitions live **in the artifact**: a map `name → {primary, fallbacks}`
+  of a concrete model id plus an ordered fallback chain. Model selection is operating policy, so
+  it is versioned with the HOP and changed only by an eval-gated diff — never by an out-of-band
+  gateway edit that would move behavior with no HOP diff and no eval pass.
+- `subscribe` — optional `"<gateway-profile>@<version>"`. The gateway keeps only **universal**
+  curation views; a HOP may pin one as a **baseline** (`subscribe`), and inline `tiers` override
+  it per tier name. The contract is **pin + notify, never live-tracking**: a gateway-profile
+  update notifies subscribers and the tuner proposes the version bump as an ordinary eval-gated
+  diff. The loader records the **resolved tier table** it ran with, so `hop {name, version}` in
+  telemetry implies an exact model set.
+- `main` — the main loop's model: a **tier name** defined in `tiers` (or the subscribed baseline),
+  or a pinned id (`claude-opus-5`).
+- `subagents` — per-role subagent model policy (`{readOnly, verify}`, a tier name or id): a cheap
   tier for read-only inventory/triage, a stronger one for verification. Composes with
-  `routing.subagents` (which selects the *strategy*); `model.subagents` names the *tiers*
-  that strategy draws from. A subagent in the `readOnly` **role** never authorizes or executes
-  a mutation, whatever tier it runs on: the host denies it every tool tagged `applies`, and it
-  can neither grant an `approval` nor produce a plan artifact. Only the main loop (or a human)
-  crosses the §10 edge. (The rule is keyed to the role, not the tier, so `readOnly: mid` is
-  still non-mutating.)
+  `routing.subagents` (which selects the *strategy*); `model.subagents` names the *tiers* that
+  strategy draws from. A subagent in the `readOnly` **role** never authorizes or executes a
+  mutation, whatever tier it runs on: the host denies it every tool tagged `applies`, and it can
+  neither grant an `approval` nor produce a plan artifact. Only the main loop (or a human) crosses
+  the §10 edge. (Keyed to the role, not the tier, so `readOnly: mid` is still non-mutating.)
 - `allowInvokeAny` — guidance (default true): the loop may invoke any catalog model via the
-  gateway on demand. A capability statement, not a restriction; the user's `/model` control
-  and session overrides always outrank the artifact.
+  gateway on demand. A capability statement, not a restriction; the user's `/model` control and
+  session overrides always outrank the artifact.
 
-`model.main` and `model.subagents.*` are declarable `tunable` with an **enum-set** range
-(§6), so a tuner may route between tiers within the declared set — eval-gated like any other
-move (a model change must clear the golden gate and the frontier margin, never a blind swap).
-The `on-model-release` trigger (§6.2) fires exactly this: a new catalog model is a mandatory
-evaluation of `model.main` against it, not an automatic migration.
+```yaml
+model:
+  subscribe: coding@3         # optional baseline; inline tiers override per name
+  tiers:
+    cheap:    { primary: gpt-5.6-luna,  fallbacks: [claude-haiku-4-5] }
+    frontier: { primary: claude-opus-5, fallbacks: [gpt-5.6-sol] }
+  main: frontier              # a tier name, or a pinned id
+  subagents: { readOnly: cheap, verify: frontier }
+```
+
+**Load-time rules.** (1) A tier referenced by `model.main`/`subagents.*` must resolve to at least
+one model; an empty or unknown tier is a **load error**, never a silent catalog fallback. (2)
+`fallbacks` is ordered and consulted **only on serving failure** (unavailable/overloaded), never
+on quality; a `model.main` fallback that is a **known lower tier's primary** is a load error (a
+`max` main loop may not silently degrade to `cheap`), while a fallback whose tier is unknown is
+allowed with a **WARN** naming it (an author-vouched serving alternate of unpinned quality). (3)
+An artifact with **no `tiers` and no `subscribe`** resolves `model.main` against the catalog as
+v1.0 back-compat, with a **WARN** that the model set is unpinned. Serving stamps the model that
+**actually served** each turn into telemetry (`model`), so a fired fallback is visible in
+distillation, never masked by the configured primary. The gateway additionally pins the HOP's key
+to exactly the declared models (per-key `model_policy`) — a serving-time backstop independent of
+the in-loop checks.
+
+`model.main` and `model.subagents.*` are declarable `tunable` with an **enum-set** range (§6)
+enumerating **tier names from the resolved table**, so a tuner may route between tiers — eval-gated
+like any other move (a model change, or a change to `tiers` contents, must clear the golden gate
+and the frontier margin, never a blind swap). The `on-model-release` trigger (§6.2) fires exactly
+this: a new catalog model is a mandatory evaluation of `model.main` against it, not an automatic
+migration.
 
 ## 9. Requirements and preflight (v1.1)
 
