@@ -1,8 +1,15 @@
 # HOP — Harness Optimization Profile (`mlpal/hop-v1`)
 
-Status: v1. This document is the normative reference for the artifact; the reference
+Status: v1.1. This document is the normative reference for the artifact; the reference
 implementation is the loader in the MLPal Harness engine (`@mlpal/harness`,
 `profile/schema` + `profile/load`), consumed by yodex ≥ 0.9.
+
+**v1.1 is additive.** The spec id stays `mlpal/hop-v1` — a v1.0 artifact is a valid v1.1
+artifact unchanged. v1.1 adds three optional top-level blocks (`model` §8, `requires` §9,
+`safety` §10), an event-driven `tuning.triggers` array beside `cadence` (§6.2), a
+categorical form for `tunable` ranges (`numeric | enum-set`, §6), and an optional versioned
+directory layout (§2). Absent, every one of these leaves v1.0 behavior exactly as it was; a
+v1.1 loader still refuses unknown top-level keys. Nothing here is a breaking change.
 
 ## 1. What a HOP is
 
@@ -44,6 +51,21 @@ The directory is the unit of distribution (copy, git, tar). Profile identity liv
 was discovered** (builtin < user dir < project dir < explicit path), never from fields
 in the file.
 
+**Discovery layout (v1.1).** A named HOP resolves under `hops/<name>/` in the project
+(`.yodex/hops/`) then the user (`~/.yodex/hops/`) root. Two layouts are accepted:
+
+```
+hops/infra/hop.yaml            # flat: a single living version
+hops/infra/1.2.0/hop.yaml      # versioned: one dir per pinned version
+hops/infra/1.1.0/hop.yaml
+```
+
+A bare reference (`--hop infra`) resolves the flat file if present, else the highest
+semver under the versioned layout; a pinned reference (`--hop infra@1.1.0`) selects that
+version directory. The flat and versioned layouts are mutually exclusive within one
+`hops/<name>/` — a loader that finds both errors rather than guess. Until a hosted
+registry exists, this filesystem layout **is** the registry.
+
 ## 3. hop.yaml
 
 ```yaml
@@ -76,13 +98,34 @@ routing:
   classifyStart: false
   escalation: { ladder: off, patience: 2 }   # ladder: catalog | off
 
+model:                        # v1.1 — the loop's model policy (§8). Optional; absent => host default.
+  main: frontier              # tier alias {cheap|mid|frontier|max} or a pinned id (claude-opus-5)
+  subagents: { readOnly: cheap, verify: mid }
+  allowInvokeAny: true        # the loop may call any catalog model via the gateway
+
 permissions:
   defaultMode: autopilot      # applied only when the user set no mode themselves
   allow: []                   # rule syntax: Tool or Tool(pattern), * wildcard
   deny: []                    # concatenates down the chain — a one-way ratchet
 
+safety:                       # v1.1 — the apply-safety envelope (§10). LOCKED whenever present.
+  toolClasses:                # per-action class (drives the applies/infra capability tags)
+    readOnly: [...]
+    mutative: [...]
+    destructive: [...]
+  preApply: { requirePlanArtifact: true, hash: [plan, identity, backend, toolVersion, lockfile, policyResults] }
+  blastRadius: { maxResources: 25, accounts: [self], regions: [us-east-2], requireTag: HopManaged=true }
+  approval: { destructive: always, outOfScope: always, costCeilingUsdMonth: 200 }
+  identities: { read: hop-read, write: hop-change-<workload>, neverSelfGrant: true }
+
 tools:
   include: []                 # allowlist over registered tools; [] = all
+
+requires:                     # v1.1 — external prerequisites checked at preflight (§9). Optional.
+  binaries:
+    - { name: aws, detect: "aws --version", setup: "https://docs.aws.amazon.com/cli/" }
+  mcp:
+    - { name: aws-mcp }
 
 budgets:
   maxTurns: 200
@@ -112,6 +155,7 @@ evals:
 
 tuning:                       # how + when this HOP is tuned; the promotion gate (§6.2)
   cadence: daily              # daily | weekly | monthly | on-incident | per-<N>-runs
+  triggers: [on-model-release, on-incident]   # v1.1 — event triggers beside the scheduled cadence
   minRunsSinceLast: 200       # statistical-power floor before a proposal
   canaryFraction: 0.1
   canaryMinRuns: 50
@@ -123,7 +167,9 @@ tuning:                       # how + when this HOP is tuned; the promotion gate
 locked: []                    # dot paths no child, user setting, or tuner may touch
 tunable:                      # the declared optimization surface
   - path: verification.selfCheck.minEdits
-    range: [1, 10]
+    range: [1, 10]            # numeric range [min, max]
+  - path: model.main
+    range: [frontier, max]    # v1.1 — categorical range (enum-set), not numeric
 ```
 
 Unknown top-level keys are a **hard error**, not a silent ignore.
@@ -189,6 +235,13 @@ only declared paths, only within range, and never a `locked` path. Published eva
 suites are referenced immutably (a digest pins the task set) so a tuned profile can't
 grade itself against a drifted rubric.
 
+A **range is `numeric | enum-set`** (v1.1). A numeric range `[min, max]` bounds a
+continuous knob (`[1, 10]`); an enum-set range `[a, b, c]` enumerates the allowed values
+of a categorical knob — `model.main: [frontier, max]` lets the tuner route between tiers,
+the one thing a numeric range could not express. A move is in-range if the target is
+within the numeric bounds, or a member of the enum set. (Absent this, a model/tier knob
+had no declarable range at all — the gap that made tier routing an unenactable proposal.)
+
 ### 6.1 Eval roles and the deterministic-gates-only rule
 
 Each eval suite may declare a `role`, and a `gates` boolean:
@@ -214,6 +267,7 @@ defaults `gates` by role; an author overrides it explicitly, and the tuner honor
 | Field | Meaning |
 |---|---|
 | `cadence` | `daily` \| `weekly` \| `monthly` \| `on-incident` \| `per-<N>-runs`. A property of the HOP, derived by the author from telemetry volume, environment drift rate, blast radius, and eval cost — high-traffic read-only HOPs tune daily; payment/infra HOPs tune slowly. |
+| `triggers` | v1.1, optional. Event-driven re-tune triggers **beside** the scheduled `cadence`: `on-model-release` (a new catalog model is a mandatory EVALUATION, not a blind migration), `on-api-change`, `on-incident`. `cadence` is the clock; `triggers` are the interrupts. Both are subject to the same evidence gate below — a trigger fires a cycle, it does not fire a promotion. |
 | `minRunsSinceLast` | statistical-power floor: a proposal needs at least this many new runs. |
 | `canaryFraction` / `canaryMinRuns` | canary rollout size before promote/rollback is decided. |
 | `promote` | `human` (a person merges the promotion) or `auto` (green evals promote). |
@@ -261,7 +315,91 @@ gateway configuration, the session store, and spec-version handling are host-own
 profile configures policy *inputs*; it cannot replace the permission engine, the
 sandbox, or the loop implementation itself.
 
-## 8. Conformance
+## 8. Model policy (v1.1)
+
+The optional `model` block declares the loop's model, so model choice is a HOP field a
+tuner can move — not a runtime accident. Before v1.1 the served model was chosen by the
+runner/settings/catalog and no HOP field named it, so "route this class to a different
+tier" was a proposal with no knob to enact. `model` closes that.
+
+- `main` — the main loop's model: a tier alias (`cheap|mid|frontier|max`, resolved through
+  the catalog) or a pinned id (`claude-opus-5`). The premium, domain-appropriate model the
+  loop runs on.
+- `subagents` — per-role subagent model policy (`{readOnly, verify}`, tier or id): a cheap
+  tier for read-only inventory/triage, a stronger one for verification. Composes with
+  `routing.subagents` (which selects the *strategy*); `model.subagents` names the *tiers*
+  that strategy draws from. A cheap subagent never authorizes or executes a mutation.
+- `allowInvokeAny` — guidance (default true): the loop may invoke any catalog model via the
+  gateway on demand. A capability statement, not a restriction; the user's `/model` control
+  and session overrides always outrank the artifact.
+
+`model.main` and `model.subagents.*` are declarable `tunable` with an **enum-set** range
+(§6), so a tuner may route between tiers within the declared set — eval-gated like any other
+move (a model change must clear the golden gate and the frontier margin, never a blind swap).
+The `on-model-release` trigger (§6.2) fires exactly this: a new catalog model is a mandatory
+evaluation of `model.main` against it, not an automatic migration.
+
+## 9. Requirements and preflight (v1.1)
+
+A HOP that needs external tools declares them; the host checks them before the run instead
+of failing mid-task. `tools.include` gates *registered* tools; `requires` declares the
+*external prerequisites* those tools depend on.
+
+```yaml
+requires:
+  binaries:
+    - { name: aws, detect: "aws --version", setup: "<url or command>" }
+    - { name: terraform, detect: "terraform version" }
+  mcp:
+    - { name: aws-mcp }          # an MCP server the HOP expects connected
+```
+
+The **preflight contract**: before the first run under a HOP, the host runs each `detect`
+command, connects each declared `mcp` server, and **reports every gap loudly** — a HOP whose
+requirements are unmet says so and offers `setup`, it never silently degrades into a HOP that
+cannot do its job. A HOP may order its detection (e.g. cloud A then B then C) so the setup
+guidance fits what is present. Preflight is a host capability; the HOP only *declares* the
+requirements, and a domain's canonical detector should be referenced, not re-derived per HOP.
+
+## 10. Safety envelope (v1.1)
+
+A HOP that performs mutating or destructive real-world actions (infra, deploys) carries a
+`safety` block: the declared, versioned envelope inside which the loop is autonomous, and the
+edge at which it must stop and ask. It is **LOCKED whenever present** — neither a child, a
+user setting, nor the tuner may loosen it — and it configures *policy inputs*; the host-owned
+catastrophic denials (§7) stay host-owned and cannot be widened by it.
+
+```yaml
+safety:
+  toolClasses: { readOnly: [...], mutative: [...], destructive: [...] }
+  preApply: { requirePlanArtifact: true, hash: [plan, identity, backend, toolVersion, lockfile, policyResults] }
+  blastRadius: { maxResources, accounts, regions, requireTag }
+  approval: { destructive: always, outOfScope: always, costCeilingUsdMonth }
+  identities: { read, write, neverSelfGrant: true }
+```
+
+- **toolClasses** classify every action read-only / mutative / destructive. The harness
+  carries these as **capability tags** (`applies`, `infra`) on the tools, so the gate keys
+  off the action class, not a tool name — a renamed or wrapped CLI keeps its class.
+- **preApply** — an apply is admitted only if it matches a reviewed **plan artifact** whose
+  hash covers the plan + identity + backend + tool version + lockfile + policy results. The
+  loop applies the hashed plan, never an ad-hoc command; enforcing this is stateful (the gate
+  consults the run's own dry-run record), not a tag check.
+- **blastRadius** — a hard ceiling: resource count, account/region allowlist, a required
+  ownership tag. A plan outside it is out-of-envelope.
+- **approval** — the edge. A plan in the DESTRUCTIVE class, outside the allowlist, or over the
+  cost/resource ceiling stops and asks. The ask **binds to the exact normalized command +
+  targets + expiry**, never "approve the deploy". In a headless/scheduled run the ask resolves
+  to a structured `needs_approval` terminal outcome (with the pending action captured out of
+  band), never a hang.
+- **identities** — the read identity and the write identity are distinct; the loop never
+  self-grants the writer role and never holds writer credentials in context.
+
+Everything inside the envelope is free (default mode `cruise`); only the edge asks. The
+envelope is a locked artifact field precisely so the boundary is auditable and evolves only
+through the eval-gated tuning loop, never a per-step human judgment call.
+
+## 11. Conformance
 
 An implementation conforms if it: refuses artifacts without `spec:`; rejects unknown
 top-level keys loudly; composes per §4 including lock enforcement at both compose time
@@ -271,3 +409,12 @@ cannot launder capability through a child; stamps `telemetry.taskType` on run ou
 validates `tuning` references against declared eval roles and refuses `promote: auto`
 without a gating golden suite (§6.2); and emits the content-free D11.2 run-outcome
 envelope (§6.3) with `failure_class` null iff success.
+
+**v1.1 additions.** A conforming v1.1 loader additionally: accepts every v1.0 artifact
+unchanged (the new blocks are optional; their absence is v1.0 behavior); treats `model`,
+`requires`, and `safety` as optional top-level blocks; accepts a `tunable` range in either
+form (`numeric [min,max]` or `enum-set [a,b,…]`) and bounds a move accordingly; **locks the
+`safety` block whenever present** (no child/user/tuner override); accepts `tuning.triggers`
+as an event-trigger array beside `cadence`; resolves both the flat and versioned discovery
+layouts (§2), erroring if a single `hops/<name>/` holds both. Preflight (§9) and the safety
+evaluator (§10) are host capabilities the loader enables, not parse-time behavior.

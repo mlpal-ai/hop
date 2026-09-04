@@ -39,16 +39,24 @@ independently evidence-checked is not delivered.
 
 ## Status
 
-v1. The spec covers the artifact, composition, lock semantics, the verification seam,
-the eval/telemetry contracts, and the optimization surface — eval `role`s (golden /
-frontier / probe) with the deterministic-gates-only rule, the `tuning` control plane
-(cadence + promotion gate, reference-validated at load, lock-checkable), and the
-content-free D11.2 run-outcome telemetry envelope the engine emits at every run's finish.
-Declared-but-not-yet-runnable in v1: the eval schema ships and lints, the local runner
+v1.1 (additive; spec id unchanged `mlpal/hop-v1`). The spec covers the artifact,
+composition, lock semantics, the verification seam, the eval/telemetry contracts, and the
+optimization surface — eval `role`s (golden / frontier / probe) with the
+deterministic-gates-only rule, the `tuning` control plane (cadence + promotion gate,
+reference-validated at load, lock-checkable), and the content-free D11.2 run-outcome
+telemetry envelope the engine emits at every run's finish. **v1.1** adds three optional
+top-level blocks — `model` (the loop's model as a tunable, enum-range field; closes the
+tier-routing gap), `requires` (external binaries + MCP servers checked at a preflight), and
+a locked `safety` envelope (tool classes, pre-apply plan-hash gate, blast-radius ceiling,
+edge approval → structured `needs_approval`) — plus a `tuning.triggers` array beside
+`cadence` (`on-model-release`, …), enum-set `tunable` ranges, and a versioned discovery
+layout. Every v1.0 artifact remains a valid v1.1 artifact unchanged.
+
+Declared-but-not-yet-runnable: the eval schema ships and lints, the local runner
 (`yodex hop eval`) lands next; the optimizer that consumes the telemetry (distill →
-propose → eval-gate → promote) is a separate build; and templated prompt slots (nudges,
-classifier) are inheritable but only definable in builtin profiles. All are called out
-inline in SPEC.md.
+propose → eval-gate → promote) is a separate build; the v1.1 blocks are normative here and
+land in the engine/CLI next; and templated prompt slots (nudges, classifier) are
+inheritable but only definable in builtin profiles. All are called out inline in SPEC.md.
 
 Prior art note: LangChain Deep Agents uses "harness profile" for a per-model
 compatibility override layer; DeepSeek Harness profiles compose plugin runtimes.
