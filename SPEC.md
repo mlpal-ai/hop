@@ -293,7 +293,7 @@ from that rule (a v1.0 block without them stays valid). `tuning` is lock-checkab
 parent that sets `locked: [tuning.promote]` forces `human` on every child (a blast-radius
 ratchet).
 
-### 6.3 Telemetry contract (D11.2)
+### 6.3 Telemetry contract (D11.2, additive D11.3 / D11.4)
 
 Every run emits one **content-free** run-outcome event — the Capture stage of the
 optimizer. Content-free by construction: the payload is an explicit allowlist of
@@ -329,6 +329,21 @@ least-wrong existing terminal while the artifact remains the source of truth; a 
 reads the parked status from the artifact, never inferred from the D11.2 event. (`run_result`
 `completed` on the artifact maps to D11.2 `success` — the artifact uses `completed` for the
 engine-terminal sense, §10.1.)
+
+**D11.3 (shipped).** `run_result: needs_approval` with `failure_class: approval_pending`
+(`failure_class_vocab@v2`), stamped `contract: "d11.3"` on every event from a d11.3
+emitter.
+
+**D11.4 (additive).** Sub-agent runs (Task children, workflow agents) emit their own
+`run.completed` under the same HOP, and in D11.2/D11.3 they are indistinguishable from
+main runs — a distiller that counts events counts every child as a run. D11.4 adds three
+payload fields: `role` (`main` \| `subagent`, required), `run_id` (the emitting run's
+session id, required), and `parent_run_id` (sub-agent runs only: the session that spawned
+the child). Ids only, never content. A consumer must **not** default an absent `role` to
+`main`: a d11.3 event may be either, so per-role rates are only computable from d11.4
+events. The host may also override the HOP's `telemetry.taskType` per run (an eval kit
+knows the scenario's task class); the event's `task_type` is the host override when set,
+else the HOP's.
 
 ## 7. Host plane (what a profile can never reach)
 
