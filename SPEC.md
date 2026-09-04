@@ -212,7 +212,16 @@ gates through it:
    verified.
 3. **antiChurn** — one mid-loop nudge when a single file is edited `threshold` times
    with no verification between.
-4. **agent** — an independent verifier agent at the finish gate. `failMode: open`
+4. **agent** — an independent verifier agent at the finish gate. `riskGate` (v1.1) picks
+   what skips it: `changed-lines` (default) skips below `riskGateMinChangedLines` of git
+   diff, meaningful for a coding deliverable and never under `closed`; `actions` skips
+   when the finishing turn made no write-capable, infra-tagged, or envelope-mutative tool
+   call (a read-only or conversational turn has nothing to verify) and verifies every turn
+   that acted, so `closed` semantics hold where they matter. A skip under `actions`
+   reports `VERDICT: PASS (skipped: …)`; a skip under `changed-lines` reports PARTIAL.
+   Note the loop's runaway guard: a blocked finish is retried at most
+   `maxStopContinuations` times (default 3); after that the run delivers with the last
+   verdict stamped on telemetry — "delivered" is not "verified". `failMode: open`
    permits PARTIAL/unverifiable outcomes (prevents runaway loops); `failMode: closed`
    blocks anything but an explicit PASS — the setting for domains where an unverified
    result must not be delivered. Fail-closed profiles never skip verification via the
@@ -450,6 +459,17 @@ detector also runs from the HOP dir (a HOP may reference its own `tools/`) and f
 exit-code mapping; stdout is scanned only for a state token. Preflight is a host capability; the
 HOP only *declares* the requirements.
 
+## 9.1 Working memory (v1.1)
+
+```yaml
+memory:
+  workspace: infra     # notes workspace the HOP reads at session start
+```
+
+`memory.workspace` names the workspace whose curated notes the host injects into the system
+prompt. Precedence: project/user settings `memory.workspace` > the HOP's `memory.workspace` >
+the working directory's basename. The note then follows the HOP, not the directory name.
+
 ## 10. Safety envelope (v1.1)
 
 A HOP that performs mutating or destructive real-world actions (infra, deploys) carries a
@@ -518,6 +538,28 @@ command and `plan_hash` the §10 preApply hash. The run exits with a distinct ex
 no-hang invariant). `status: completed` is the engine-terminal sense and maps to D11.2
 `success` (§6.3); the agent-authored task statuses (`ok` / `refused` / `needs_clarification`)
 come from the agent's own final output, not this artifact.
+
+### 10.2 Attempt trace
+
+When the host is given a trace path (`$YODEX_HOP_TRACE_FILE`, out of the graded workdir) it
+writes one JSONL line per tool attempt, **with the effective outcome of the whole permission
+cascade** — never the envelope's own verdict, which runs before allow rules and the mode:
+
+```json
+{ "ts": "...", "tool": "Bash", "command": "...",
+  "class": "readOnly | mutative | destructive | unknown",
+  "disposition": "allowed | denied | parked",
+  "reason": "<§10 reason> | hard_deny | deny_rule | mode_refused | mode_refused_headless | user_declined",
+  "detail": "..." }
+```
+
+`class` comes from the HOP's `toolClasses`; a command matching no pattern on a tool
+without capability tags is `unknown` — never a read. The envelope never admits `unknown` on
+its own (allow rules and the mode decide it), so graders treat `unknown` as fixture
+coverage, not a failure. `parked` appears only for a headless run stopped at the edge
+(§10.1); an interactive decline is `denied` / `user_declined`. The trace is written whether
+or not the HOP has a `safety` block (without one, `class` is `readOnly` for read-only tools
+and `unknown` otherwise). Reads are traced as `allowed` so a merge with a call log is 1:1.
 
 ## 11. Conformance
 
