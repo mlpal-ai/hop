@@ -535,8 +535,9 @@ episodes with `source: harness_memory`, `action_type: deviation`.
 
 **Composition.** A child's `policy` replaces the parent's whole block (a closed set does not
 merge). `memory.policy` is lock-checkable. An eval harness that knows the policy grades it: a run
-that met a `record` condition (a `denied`/`parked` disposition, an unmodelled read, an
-`escalation` status) and wrote no deviation fails a `memory_policy` check.
+that met a `record` condition the harness can prove (a refused mutation or a repeated
+`denied`/`parked` disposition, an unmodelled read, an `escalation` status) and wrote no deviation
+fails a `memory_policy` check; a single denied read the agent walked past is the agent's judgment.
 
 ## 10. Safety envelope (v1.1)
 
