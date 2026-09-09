@@ -470,6 +470,74 @@ memory:
 prompt. Precedence: project/user settings `memory.workspace` > the HOP's `memory.workspace` >
 the working directory's basename. The note then follows the HOP, not the directory name.
 
+## 9.2 Memory policy (v1.1, additive)
+
+```yaml
+memory:
+  workspace: infra
+  policy:
+    record: [refusal, verifier_fail, unmodelled, correction, surprise, escalation]
+    feeds: [tune, evals]
+```
+
+`memory.policy` makes "this did not go to plan" a first-class, machine-readable record. Without
+it a run that was refused, corrected or surprised leaves only a transcript; with it the run leaves
+a **deviation memory** that the builder's next tune turn reads, counts, and turns into knob
+proposals and eval cases. The prompt can say "remember failures", and this spec's reference HOP
+did; it wrote 61 memories in five days and not one was findable as a failure. A policy is
+load-checked, host-rendered, and eval-gradable; a prompt line is none of those.
+
+**`record`** — the closed set of deviation kinds the agent MUST save before the run ends
+(headless) or before its next answer (interactive). One memory per distinct deviation, not per
+retry. Unknown kinds are a load error naming the value.
+
+| kind | when |
+|---|---|
+| `refusal` | the permission gate refused or parked a call the plan needed (attempt-trace disposition `denied` / `parked`, §10.2) |
+| `verifier_fail` | the verifier failed the turn and the agent had to redo it |
+| `unmodelled` | a read the environment could not answer: an unrecorded snapshot read, a missing CLI, an API the identity cannot reach |
+| `correction` | a person corrected the agent's answer, action or classification |
+| `surprise` | observed state contradicts memory, the notes or IaC |
+| `escalation` | the run stopped at the envelope edge (`needs_approval`, `needs_clarification`, `refused`) |
+
+**Record form.** A deviation is a `Memorize` write with `type: deviation`, slug
+`dev-<kind>-<short-noun>`, project scope, and a body in this line grammar, which the builder
+parses without a model:
+
+```
+kind: unmodelled
+expected: aws ec2 describe-volumes lists the account's volumes
+observed: SnapshotUnmodelled on the unfiltered listing; only --filters status=available answers
+cause: environment coverage (the recording holds one shape of the read)
+action: serve the unfiltered listing from the recorded filtered one
+run: <run_id from the telemetry contract, §6.3, when the host exposes it>
+```
+
+`cause` may be `unknown`; `action` is what would have made the run go to plan. The never-rule of
+§10 applies unchanged: no secret values, tokens or kubeconfig material in a memory. The host
+stamps provenance (`hop`, `prompt_sha`, `origin`) on every write, so a bad rule that became a
+memorised policy is findable by the prompt that produced it.
+
+**`feeds`** — which builder consumers may read deviation memories. `tune`: the distiller emits
+`hop:<name>|deviation|<kind>` facts and the proposer emits `eval` proposals citing them (advisory:
+no knob expresses "write a case"). `evals`: the builder mines deviations into candidate scenarios
+under `evals/candidates/`, each reviewed by a person before it becomes golden. Default both; an
+empty list is refused (a policy that records and feeds nothing is a mistake, not a choice).
+
+**Host obligations.** A conformant host (a) validates `record` and `feeds` against their closed
+sets; (b) renders the effective policy into the system prompt, so the agent does not depend on
+the HOP's own prose to know its obligation; (c) MAY auto-record `refusal`, `verifier_fail` and
+`escalation` from its own trace, in which case its conformance statement says so and the agent
+records only what the host cannot see (`unmodelled`, `correction`, `surprise`). The tier a
+deviation lands in (a local topic file, or the org's memory graph when the host mirrors writes)
+is the host's `memory.backend` concern; the shipping step of §6.3 carries topic memories as
+episodes with `source: harness_memory`, `action_type: deviation`.
+
+**Composition.** A child's `policy` replaces the parent's whole block (a closed set does not
+merge). `memory.policy` is lock-checkable. An eval harness that knows the policy grades it: a run
+that met a `record` condition (a `denied`/`parked` disposition, an unmodelled read, an
+`escalation` status) and wrote no deviation fails a `memory_policy` check.
+
 ## 10. Safety envelope (v1.1)
 
 A HOP that performs mutating or destructive real-world actions (infra, deploys) carries a
