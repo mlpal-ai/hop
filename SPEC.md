@@ -343,6 +343,12 @@ engine-terminal sense, §10.1.)
 (`failure_class_vocab@v2`), stamped `contract: "d11.3"` on every event from a d11.3
 emitter.
 
+**D11.5 (additive, memory v6 E1a).** `memories_injected`: the event_ids of the local memory
+topics rendered into the run's system prompt, so served memories can be joined with run
+verdicts (trust by consequence). Absent on older events; a run with no memories carries an
+empty list. Retrieval-time ids are attributed server-side: every MCP tools/call carries
+`_meta { "mlpal/run_id", "mlpal/hop", "mlpal/origin" }`.
+
 **D11.4 (additive).** Sub-agent runs (Task children, workflow agents) emit their own
 `run.completed` under the same HOP, and in D11.2/D11.3 they are indistinguishable from
 main runs — a distiller that counts events counts every child as a run. D11.4 adds three
@@ -499,6 +505,8 @@ retry. Unknown kinds are a load error naming the value.
 | `correction` | a person corrected the agent's answer, action or classification |
 | `surprise` | observed state contradicts memory, the notes or IaC |
 | `escalation` | the run stopped at the envelope edge (`needs_approval`, `needs_clarification`, `refused`) |
+| `outcome` | (v1.1 addendum 2026-09-15) a person accepted, followed or verified what the agent delivered, or discarded or redid it: the positive signal a deviation cannot give |
+| `preference` | (v1.1 addendum 2026-09-15) a person said how they want things: format, channel, scope, timing |
 
 **Record form.** A deviation is a `Memorize` write with `type: deviation`, slug
 `dev-<kind>-<short-noun>`, project scope, and a body in this line grammar, which the builder
@@ -518,7 +526,7 @@ run: <run_id from the telemetry contract, §6.3, when the host exposes it>
 stamps provenance (`hop`, `prompt_sha`, `origin`) on every write, so a bad rule that became a
 memorised policy is findable by the prompt that produced it.
 
-**`feeds`** — which builder consumers may read deviation memories. `tune`: the distiller emits
+**`feeds`** — which consumers may read the recorded memories. `personalize` (addendum 2026-09-15): the person's own next sessions read their `preference` and `outcome` memories; nothing else does without a lift (§9.3). `tune`: the distiller emits
 `hop:<name>|deviation|<kind>` facts and the proposer emits `eval` proposals citing them (advisory:
 no knob expresses "write a case"). `evals`: the builder mines deviations into candidate scenarios
 under `evals/candidates/`, each reviewed by a person before it becomes golden. Default both; an
@@ -538,6 +546,57 @@ merge). `memory.policy` is lock-checkable. An eval harness that knows the policy
 that met a `record` condition the harness can prove (a refused mutation or a repeated
 `denied`/`parked` disposition, an unmodelled read, an `escalation` status) and wrote no deviation
 fails a `memory_policy` check; a single denied read the agent walked past is the agent's judgment.
+
+## 9.3 Memory contract (v1.1, additive, 2026-09-15)
+
+```yaml
+memory:
+  workspace: infra
+  tenant: from-registry                 # the memory org this deployment writes and reads; a registry entry names it
+  policy: { record: [refusal, verifier_fail, unmodelled, correction, surprise, escalation, outcome, preference],
+            feeds: [tune, evals, personalize] }
+  topics:
+    - { id: infra/state/cost-daily,     kind: state,      key: date,   halfLife: 1d,  read: company, inject: true }
+    - { id: infra/state/watch/{target}, kind: state,      key: target, halfLife: 2x,  read: company }
+    - { id: infra/learning,             kind: learning,   key: dedup,  halfLife: 1y,  read: company }
+    - { id: infra/deviation,            kind: deviation,  key: run,    halfLife: 90d, read: owner }
+    - { id: person/{me}/pref/infra,     kind: preference, key: field,  read: self,    inject: true }
+  reads:  [company/ownership]           # topics of the company or of other HOPs this HOP subscribes to
+  writes: [infra/*, person/{me}/pref/infra]
+```
+
+A HOP's memory is a set of **topics**: named, typed streams of claims. Sources (the company's data)
+are not memory; they are read through tools and never copied. Session context is not memory; it is
+distilled into topics. A topic has:
+
+| field | meaning |
+|---|---|
+| `id` | the address. Segments separated by `/`; `{target}` and `{me}` are placeholders filled at write time (the watched target; the calling person) |
+| `kind` | `state` (what is true now; keyed; one current value; superseded on write) · `record` (what happened; append-only) · `learning` (found out, generalises; deduplicated) · `preference` (how a person or team wants things) · `deviation` (the plan failed; §9.2 grammar) |
+| `key` | the key rule: `date`, `target`, `field`, `run`, `dedup`, or a field name; a `state` topic MUST have a key other than `dedup` |
+| `halfLife` | `<n>d`, `<n>w`, `<n>y`, `none`, or `<n>x` (n refresh cadences of the routine that writes it; a `state` older than that is stale, not wrong). Defaults per kind: state 2x, record none, learning 1y, preference none, deviation 90d |
+| `read` | the widest scope that may read: `self` · `owner` · `team` · `company` · `fleet` |
+| `inject` | optional; the current value(s) are rendered at session start. Default false |
+
+**Rules.** A HOP writes only the topics it declares under `writes` (globs over ids); every declared
+topic must be covered by `writes`. It reads what it declares under `reads` in addition to its own; a
+read of another HOP's topic is a subscription the other HOP's owner granted. It never writes into
+another HOP's topic: it proposes, through the store's publish verb. `person/{me}/…` topics are born at
+the person's own scope and are theirs. Safety (§10) reads nothing from memory. `tenant` names the
+memory org this deployment uses; a host passes it to the memory server (under real auth the token's
+org is authoritative and must agree).
+
+**Host obligations.** Validate: unknown kind, unknown read scope, a `state` topic without a key,
+duplicate ids, a topic not covered by `writes` are load errors naming the value. Render the
+`inject: true` topics' current values and the person's preferences at session start. Stamp every
+claim with the topic id, key, kind, evidence ids, hop, prompt hash and origin. A claim without
+evidence ids is refused by the store.
+
+**Trust (informative).** A claim is a hypothesis on probation. It earns trust from grounding
+(evidence ids), corroboration (re-observation), consequence (runs that used it passed), endorsement
+(a person) and survival (not superseded or contradicted). Immediate use by the writer needs grounding;
+team use needs corroboration; a builder turn promotes only from corroborated or endorsed claims; a
+permissions widening needs a person regardless.
 
 ## 10. Safety envelope (v1.1)
 
