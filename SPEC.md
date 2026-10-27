@@ -193,6 +193,9 @@ Special rules:
   merging halves of two lists produces artifacts nobody wrote. An absent `tools.include`
   inherits the parent's (absent at the root = every registered tool); `[]` is a present
   value meaning no tools, so a child writing `[]` overrides a parent's list with none.
+  An engine with modules (tool bundles a profile switches on) merges an enabled module's
+  tools into a present `tools.include`, `[]` included, so `[]` with a module enabled
+  resolves to that module's tools, not to none.
 - `locked` accumulates down the chain.
 
 Runtime precedence, lowest to highest:
