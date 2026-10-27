@@ -118,8 +118,11 @@ permissions:
 # Omitted here: a coding HOP has none, and a safety block forbids defaultMode: autopilot
 # (§10). See §10 for the full block, shown with defaultMode: cruise.
 
-tools:
-  include: []                 # allowlist over registered tools; [] = all
+# tools:                      # omitted here: absent = every registered tool (a child that
+#   include: [Read, Grep]     # omits it inherits its parent's). A list is an allowlist over
+#                             # registered tools; [] = NO tools. A listed name the host does not
+#                             # register is warned by the engine at use time (only the host
+#                             # knows its registry). Changed 2026-10-26: [] used to mean all.
 
 requires:                     # v1.1 — external prerequisites checked at preflight (§9). Optional.
   binaries:
@@ -187,7 +190,9 @@ Special rules:
   remove an ancestor's. `permissions.allow` also concatenates but is lock-checkable,
   because added allows can loosen policy.
 - `tools.include` and each `tunable` entry replace **whole-value per name/path** —
-  merging halves of two lists produces artifacts nobody wrote.
+  merging halves of two lists produces artifacts nobody wrote. An absent `tools.include`
+  inherits the parent's (absent at the root = every registered tool); `[]` is a present
+  value meaning no tools, so a child writing `[]` overrides a parent's list with none.
 - `locked` accumulates down the chain.
 
 Runtime precedence, lowest to highest:
@@ -695,7 +700,8 @@ and `unknown` otherwise). Reads are traced as `allowed` so a merge with a call l
 
 An implementation conforms if it: refuses artifacts without `spec:`; rejects unknown
 top-level keys loudly; composes per §4 including lock enforcement at both compose time
-and settings-application time; applies the toolset allowlist to **every** run path the
+and settings-application time; treats an absent `tools.include` as every registered tool and
+`[]` as none; applies the toolset allowlist to **every** run path the
 session can spawn (sub-agents, peer agents, workflow agents) so a restricted profile
 cannot launder capability through a child; stamps `telemetry.taskType` on run outcomes;
 validates `tuning` references against declared eval roles and refuses `promote: auto`
