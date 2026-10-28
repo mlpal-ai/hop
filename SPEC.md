@@ -1,6 +1,6 @@
 # HOP — Harness Optimization Profile (`mlpal/hop-v1`)
 
-Status: v1.1. This document is the normative reference for the artifact; the reference
+Status: v1.2. This document is the normative reference for the artifact; the reference
 implementation is the loader in the MLPal Harness engine (`@mlpal/harness`,
 `profile/schema` + `profile/load`). v1.0 blocks are consumed by yodex ≥ 0.9; the v1.1 blocks
 require the yodex release that lands the v1.1 loader.
@@ -10,6 +10,12 @@ artifact unchanged. v1.1 adds three optional top-level blocks (`model` §8, `req
 `safety` §10), an event-driven `tuning.triggers` array beside `cadence` (§6.2), a
 categorical form for `tunable` ranges (`numeric | enum-set`, §6), and an optional versioned
 directory layout (§2). Absent, every one of these leaves v1.0 behavior exactly as it was.
+
+**v1.2 is additive (2026-10-28, Harness Platform part 2).** The spec id stays `mlpal/hop-v1`.
+v1.2 adds four optional top-level blocks (§12) that a platform publication reads: `sandbox`,
+`workspace`, `credentials` and `processes`, and two optional keys under `memory` (§9.2):
+`promotion` and `limits`. Absent, every one leaves v1.1 behavior exactly as it was; unknown keys
+still fail lint.
 
 Additivity is **one-directional**: every v1.0 artifact loads under v1.1, but an artifact that
 *uses* a v1.1 block requires a v1.1 loader — an older loader refuses it with the
@@ -726,3 +732,47 @@ all-or-nothing rule, and keeps `on-incident` out of `cadence`; resolves both the
 versioned discovery layouts (§2), erroring if a single `hops/<name>/` holds both. Preflight
 (§9) and the safety evaluator (§10) are host capabilities the loader enables, not parse-time
 behavior.
+
+## 12. Platform declarations (v1.2, additive, 2026-10-28)
+
+A HOP that runs on the Harness Platform declares what it needs from the execution, secrets and
+memory planes. The engine never widens these: the platform computes the effective profile from the
+declaration and the unit policy (it can only restrict), and hands the engine the result. Every block
+is optional; a desktop run reads only `sandbox.egress` and `sandbox.size_class` (sent on sandbox
+create) and ignores the rest.
+
+```yaml
+sandbox:
+  size_class: 1c2g | 2c4g                 # the size class the fleet serves; default 1c2g
+  template: hands | <name>@<version>      # the sandbox template; default hands
+  egress: [<host> | <host>:<port>]        # outbound hosts the sandbox may reach; a scheme, a
+                                          # wildcard or a port outside 1–65535 is refused
+workspace:
+  policy: ephemeral | session | persistent   # default session (§4.3 of the platform spec)
+credentials:                              # references only — a `value` key is refused by lint and
+  - ref: <vault id or name>               # never echoed; the platform resolves refs to its vault
+    tool: <mcp server name> | sandbox
+    host: <bare host, no port>
+    header: <HTTP field name>
+processes:                                # HOP-supplied processes the platform runs in the sandbox
+  mcp_stdio:
+    - name: <[A-Za-z0-9_-]{1,64}>         # unique
+      argv: [<string>, …]                 # at least one
+      env_names: [<ENV_NAME>, …]          # names only; values come from the platform's bindings
+  hooks: <bool>                           # command hooks run in the sandbox (default false)
+  lsp: <bool>                             # a guest language server (default false; not offered yet)
+```
+
+Under `memory` (§9.2) v1.2 adds:
+
+```yaml
+memory:
+  promotion: auto | review                # how a run's staged memory reaches the store
+  limits:
+    max_nodes: <int > 0>
+    max_bytes: <int > 0>
+    max_write_bytes: <int > 0>
+```
+
+Lint (`yodex hop lint`) and the bundle loader accept all of the above; unknown keys at any level
+fail, as before. The reference loader is `@mlpal/harness` `profile/schema` + `profile/load`.
