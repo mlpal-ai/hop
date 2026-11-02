@@ -809,16 +809,20 @@ The **host contract** (normative):
   person's own kubeconfig for `source: local-context`, only after the person confirms it for the
   session, interactively or by an explicit host flag, and the confirmation is recorded in the
   session's audit with who and which context).
-- The agent's commands never receive the credential. The host serves it through a proxy on
+- The agent's commands never receive the credential: what they hold is no credential usable off
+  the loopback proxy. The host serves it through a proxy on
   loopback and gives the commands a kubeconfig (outside every workspace root, read-only) whose
   context holds the proxy's URL and a per-session capability, never the token, certificate or key.
   `~/.kube` stays unreadable in the sandbox.
 - The per-session capability is **read-only**: reads, the self-subject reviews, and changes sent as a
-  server dry run. A change is served only to one command the host's permission cascade admitted as
-  a kubectl, oc or helm change, with nothing else on its line, through a one-time capability granted
-  for that command's lifetime and revoked when it exits. A raw HTTP client holding the session's
-  capability can read what the identity's RBAC allows (API-server proxy subresources included) and
-  change nothing.
+  server dry run to an API group the API server itself serves (never an aggregated or custom
+  resource group, whose dry-run handling is the upstream's). A change is served only to one command
+  the host's permission cascade admitted as a kubectl, oc or helm change, with nothing else on its
+  line that could use it and starting no program of its own (a helm post-renderer, a chart
+  downloader plugin, an editor, a kustomize plugin or helm inflation), through a one-time capability
+  that lapses to read-only after a bounded time or once idle, and is revoked when the command exits.
+  A raw HTTP client holding the session's capability can read what the identity's RBAC allows
+  (API-server proxy subresources included) and change nothing.
 - The proxy forwards to the bound cluster's origin only; no part of a request names another scheme,
   host or port.
 - The host refuses a cluster served without TLS verification (`insecure-skip-tls-verify`) unless
