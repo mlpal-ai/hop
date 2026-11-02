@@ -797,6 +797,7 @@ credentials:
     name: <dns label>              # the kube context the agent's commands see; default: the ref
     source: secret | local-context # default secret
     namespace: <dns label>         # optional: the context's default namespace
+    allowInsecureTls: false        # optional: true serves a cluster whose kubeconfig skips TLS verification
 requires:
   kube:
     - { credential: <name> }
@@ -812,6 +813,19 @@ The **host contract** (normative):
   loopback and gives the commands a kubeconfig (outside every workspace root, read-only) whose
   context holds the proxy's URL and a per-session capability, never the token, certificate or key.
   `~/.kube` stays unreadable in the sandbox.
+- The per-session capability is **read-only**: reads, the self-subject reviews, and changes sent as a
+  server dry run. A change is served only to one command the host's permission cascade admitted as
+  a kubectl, oc or helm change, with nothing else on its line, through a one-time capability granted
+  for that command's lifetime and revoked when it exits. A raw HTTP client holding the session's
+  capability can read what the identity's RBAC allows (API-server proxy subresources included) and
+  change nothing.
+- The proxy forwards to the bound cluster's origin only; no part of a request names another scheme,
+  host or port.
+- The host refuses a cluster served without TLS verification (`insecure-skip-tls-verify`) unless
+  the entry sets `allowInsecureTls: true`; then it warns at start and binds `insecure` into what the
+  apply gate matches.
+- Where the platform can, the sandbox reaches the proxy and not the cluster's real endpoint; what a
+  platform cannot enforce is reported, not assumed.
 - With any kube credential declared, the commands' `KUBECONFIG` always names that file, even when a
   credential could not be served, so no command falls back to an ambient kubeconfig.
 - A host's apply gate binds a context served this way by the credential's real upstream (server,
