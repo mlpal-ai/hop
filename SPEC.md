@@ -1,6 +1,6 @@
 # HOP — Harness Optimization Profile (`mlpal/hop-v1`)
 
-Status: v1.2. This document is the normative reference for the artifact; the reference
+Status: v1.3. This document is the normative reference for the artifact; the reference
 implementation is the loader in the MLPal Harness engine (`@mlpal/harness`,
 `profile/schema` + `profile/load`). v1.0 blocks are consumed by yodex ≥ 0.9; the v1.1 blocks
 require the yodex release that lands the v1.1 loader.
@@ -16,6 +16,10 @@ v1.2 adds four optional top-level blocks (§12) that a platform publication read
 `workspace`, `credentials` and `processes`, and two optional keys under `memory` (§9.2):
 `promotion` and `limits`. Absent, every one leaves v1.1 behavior exactly as it was; unknown keys
 still fail lint.
+
+**v1.3 is additive (2026-11-01, D-55).** The spec id stays `mlpal/hop-v1`. v1.3 adds a cluster
+credential kind to `credentials` (§12.1: `tool: kube`, with `name`, `source` and `namespace`) and
+`requires.kube` (§9) for its preflight. Absent, both leave v1.2 behavior exactly as it was.
 
 Additivity is **one-directional**: every v1.0 artifact loads under v1.1, but an artifact that
 *uses* a v1.1 block requires a v1.1 loader — an older loader refuses it with the
@@ -459,6 +463,11 @@ requires:
     - { name: aws-mcp }          # an MCP server the HOP expects connected
 ```
 
+v1.3 adds `requires.kube: [{credential: <name>}]`: each names a kube credential the HOP declares
+(§12.1; a name no credential declares is a load error). Preflight reaches that cluster through the
+host's credential proxy, as a command would, and reports the §9 state and the identity it acts as;
+never the credential.
+
 The **preflight contract**: before the first run under a HOP, the host runs each `detect`
 command, connects each declared `mcp` server, and **reports every gap loudly** — a HOP whose
 requirements are unmet says so and offers `setup`, it never silently degrades into a HOP that
@@ -776,3 +785,38 @@ memory:
 
 Lint (`yodex hop lint`) and the bundle loader accept all of the above; unknown keys at any level
 fail, as before. The reference loader is `@mlpal/harness` `profile/schema` + `profile/load`.
+
+### 12.1 Cluster credentials (v1.3, additive, 2026-11-01)
+
+A `credentials` entry with `tool: kube` is a cluster credential, not a header injection:
+
+```yaml
+credentials:
+  - ref: <secret id or name | local context name>   # never a value (lint refuses `value`)
+    tool: kube
+    name: <dns label>              # the kube context the agent's commands see; default: the ref
+    source: secret | local-context # default secret
+    namespace: <dns label>         # optional: the context's default namespace
+requires:
+  kube:
+    - { credential: <name> }
+```
+
+The **host contract** (normative):
+
+- The host resolves `ref` (from the platform secrets service for `source: secret`; a context of the
+  person's own kubeconfig for `source: local-context`, only after the person confirms it for the
+  session, interactively or by an explicit host flag, and the confirmation is recorded in the
+  session's audit with who and which context).
+- The agent's commands never receive the credential. The host serves it through a proxy on
+  loopback and gives the commands a kubeconfig (outside every workspace root, read-only) whose
+  context holds the proxy's URL and a per-session capability, never the token, certificate or key.
+  `~/.kube` stays unreadable in the sandbox.
+- With any kube credential declared, the commands' `KUBECONFIG` always names that file, even when a
+  credential could not be served, so no command falls back to an ambient kubeconfig.
+- A host's apply gate binds a context served this way by the credential's real upstream (server,
+  CA, identity, the credential's version), never by the proxy URL.
+- A credential that cannot be resolved is not served, and the gap is reported (fail closed).
+
+Hosted runs (engine pods, remote hands) serve kube credentials through the platform egress proxy;
+that is a later phase of the platform, outside this section.
