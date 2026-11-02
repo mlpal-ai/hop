@@ -818,8 +818,10 @@ The **host contract** (normative):
   server dry run to an API group the API server itself serves (never an aggregated or custom
   resource group, whose dry-run handling is the upstream's). A change is served only to one command
   the host's permission cascade admitted as a kubectl, oc or helm change, with nothing else on its
-  line that could use it and starting no program of its own (a helm post-renderer, a chart
-  downloader plugin, an editor, a kustomize plugin or helm inflation), through a one-time capability
+  line that could use it, starting no program of its own (a helm post-renderer, a chart
+  downloader plugin, an editor, a kustomize plugin or helm inflation), and reaching the cluster
+  only through the governed kubeconfig (no other kubeconfig, server or authentication on the
+  line, so no `exec` or `auth-provider` user of another file), through a one-time capability
   that lapses to read-only after a bounded time or once idle, and is revoked when the command exits.
   A raw HTTP client holding the session's capability can read what the identity's RBAC allows
   (API-server proxy subresources included) and change nothing.
